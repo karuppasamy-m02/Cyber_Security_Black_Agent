@@ -129,7 +129,7 @@ export const AttackScenarios: React.FC = () => {
       const docEl = document.documentElement as any;
       if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
         if (docEl.requestFullscreen) {
-          docEl.requestFullscreen().catch(() => {});
+          docEl.requestFullscreen().catch(() => { });
         } else if (docEl.webkitRequestFullscreen) {
           docEl.webkitRequestFullscreen();
         } else if (docEl.mozRequestFullScreen) {
@@ -204,7 +204,7 @@ export const AttackScenarios: React.FC = () => {
           '[+] Browser controls restored.'
         ]);
         if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+          document.exitFullscreen().catch(() => { });
         }
       }
     } catch {
@@ -590,9 +590,8 @@ export const AttackScenarios: React.FC = () => {
         <div className="flex items-center gap-3 text-xs text-[#888888]">
           <span className="flex items-center gap-1.5">
             <span
-              className={`w-2 h-2 rounded-full ${
-                isDarkActive ? 'bg-[#FFFFFF] animate-ping' : 'bg-[#555555]'
-              }`}
+              className={`w-2 h-2 rounded-full ${isDarkActive ? 'bg-[#FFFFFF] animate-ping' : 'bg-[#555555]'
+                }`}
             />
             Target Ingress: <strong className="text-[#FFFFFF]">{isDarkActive ? 'DECOY OPEN' : 'ARMORED'}</strong>
           </span>
@@ -665,17 +664,16 @@ export const AttackScenarios: React.FC = () => {
         {terminalHistory.map((line, idx) => (
           <div
             key={idx}
-            className={`leading-relaxed whitespace-pre-wrap ${
-              line.startsWith('c2-operator@terminal')
-                ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#151515] first:border-0'
-                : line.includes('ACCESS BLOCKED') || line.includes('dropped')
+            className={`leading-relaxed whitespace-pre-wrap ${line.startsWith('c2-operator@terminal')
+              ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#151515] first:border-0'
+              : line.includes('ACCESS BLOCKED') || line.includes('dropped')
                 ? 'text-[#888888]'
                 : line.includes('EXPLOIT SUCCESSFUL') || line.includes('SAVED') || line.includes('BEGIN')
-                ? 'text-[#FFFFFF] font-bold'
-                : line.includes('WARNING') || line.includes('LOCKING')
-                ? 'text-[#CCCCCC] font-bold'
-                : 'text-[#AAAAAA]'
-            }`}
+                  ? 'text-[#FFFFFF] font-bold'
+                  : line.includes('WARNING') || line.includes('LOCKING')
+                    ? 'text-[#CCCCCC] font-bold'
+                    : 'text-[#AAAAAA]'
+              }`}
           >
             {line}
           </div>
