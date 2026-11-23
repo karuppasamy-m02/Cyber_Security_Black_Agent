@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -10,6 +10,8 @@ from app.models.incidents import Incident, IncidentEvent
 from app.models.response import ResponseAction
 from app.schemas.events import EventIngest
 from app.services.event_service import EventService
+from app.services.agents_service import black_agent, red_agent
+from app.websocket.manager import ws_manager
 
 router = APIRouter(prefix="/attacks", tags=["Attack Scenarios & Simulations"])
 
@@ -367,14 +369,23 @@ def list_attack_scenarios():
     return ATTACK_SCENARIOS
 
 @router.post("/simulate/{scenario_id}", response_model=Dict[str, Any])
-async def simulate_attack_scenario(scenario_id: str, db: Session = Depends(get_db)):
+async def simulate_attack_scenario(scenario_id: str, request: Request, db: Session = Depends(get_db)):
     """
     Executes a real-world cyber attack simulation through the AMTIE detection pipeline.
-    Demonstrates ingestion, 5-layer classification, risk scoring, incident generation, and response recommendations.
+    Demonstrates Black Agent (Perimeter & Port Defense) and Red Agent (Deception & Counter-Strike).
     """
     scenario = next((s for s in ATTACK_SCENARIOS if s["id"] == scenario_id), None)
     if not scenario:
         raise HTTPException(status_code=404, detail=f"Attack scenario '{scenario_id}' not found.")
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else scenario["source_ip"])
+    user_agent = request.headers.get("user-agent", "Unknown Mobile/Offensive Client")
+
+    # 1. Black Agent Autonomous Defense (Port & Gateway Fortress)
+    black_defense = black_agent.record_defense(scenario, client_ip)
+
+    # 2. Red Agent Autonomous Deception, Footprint Tracking & Counter-Strike
+    red_response = red_agent.execute_deception_and_counter_strike(scenario, client_ip, user_agent)
 
     # Create ingestion payload
     ingest_payload = EventIngest(
@@ -428,6 +439,20 @@ async def simulate_attack_scenario(scenario_id: str, db: Session = Depends(get_d
     except Exception:
         db.rollback()
 
+    # Broadcast Dual-Agent Action over WebSocket
+    try:
+        await ws_manager.broadcast_event({
+            "type": "DUAL_AGENT_ACTION",
+            "black_agent": black_defense,
+            "red_agent": {
+                "dummy_data": red_response["dummy_data"],
+                "footprint": red_response["footprint"],
+                "counter_strike": red_response["counter_strike"]
+            }
+        })
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "scenario_id": scenario["id"],
@@ -454,5 +479,7 @@ async def simulate_attack_scenario(scenario_id: str, db: Session = Depends(get_d
             "id": scenario["mitre_id"],
             "technique": scenario["mitre_technique"],
             "tactic": scenario["mitre_tactic"]
-        }
+        },
+        "black_agent": black_defense,
+        "red_agent": red_response
     }

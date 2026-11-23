@@ -11,9 +11,11 @@ import {
   Layers,
   Shield,
   Wifi,
-  WifiOff
+  WifiOff,
+  Crosshair
 } from 'lucide-react';
 import { SeverityBadge } from '../components/ui/SeverityBadge';
+import { DualAgentDeck } from '../components/agents/DualAgentDeck';
 import { api } from '../services/api';
 
 interface LiveEvent {
@@ -124,29 +126,29 @@ export const Monitoring: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-200">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#263449]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#2B2B2B]">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+            <h1 className="text-xl font-semibold text-[#F5F5F2] tracking-tight">
               Real-Time Telemetry Stream
             </h1>
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${isConnected
-                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
-                : 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/40'
+                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-800/40'
+                : 'bg-red-950/50 text-red-400 border-red-800/40'
                 }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
+                className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'
                   }`}
               />
               {isConnected ? 'WebSocket Active' : 'Disconnected (Reconnecting...)'}
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Live wire-speed security event stream broadcast directly from the AMTIE ingestion pipeline
+          <p className="text-xs text-[#A8A8A3] mt-1">
+            Live wire-speed security event stream broadcast directly from the AMTIE ingestion pipeline &amp; Dual-Agent network
           </p>
         </div>
 
@@ -154,8 +156,8 @@ export const Monitoring: React.FC = () => {
           <button
             onClick={() => setIsPaused(!isPaused)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${isPaused
-              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60 text-amber-700 dark:text-amber-400'
-              : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-[#263449] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+              ? 'bg-amber-950/40 border-amber-700/60 text-amber-400'
+              : 'bg-[#111111] border-[#2B2B2B] text-[#F5F5F2] hover:bg-[#1A1A1A]'
               }`}
           >
             {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
@@ -164,7 +166,7 @@ export const Monitoring: React.FC = () => {
 
           <button
             onClick={() => setEvents([])}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263449] hover:border-red-300 dark:hover:border-red-800 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111111] border border-[#2B2B2B] hover:border-red-800 text-xs font-medium text-[#A8A8A3] hover:text-red-400 transition-all"
             title="Clear Stream Buffer"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -173,27 +175,30 @@ export const Monitoring: React.FC = () => {
         </div>
       </div>
 
+      {/* Autonomous Dual-Agent Operations Deck */}
+      <DualAgentDeck />
+
       {/* Control Bar: Search & Severity Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#A8A8A3] absolute left-3 top-2.5 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter stream by IP, event category, or payload..."
-            className="w-full bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263449] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono transition-colors"
+            className="w-full bg-[#111111] border border-[#2B2B2B] rounded-lg pl-9 pr-4 py-2 text-xs text-[#F5F5F2] placeholder-[#A8A8A3]/60 focus:outline-none focus:border-[#F5F5F2] font-mono transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#172033] border border-slate-200 dark:border-[#263449] p-1 rounded-lg">
+        <div className="flex items-center gap-1 bg-[#171717] border border-[#2B2B2B] p-1 rounded-lg">
           {['ALL', 'Critical', 'High', 'Medium', 'Low'].map((sev) => (
             <button
               key={sev}
               onClick={() => setSeverityFilter(sev)}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors ${severityFilter === sev
-                ? 'bg-white dark:bg-[#111827] text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-[#263449]'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-[#2B2B2B] text-[#F5F5F2] shadow-sm border border-[#3E3E3E]'
+                : 'text-[#A8A8A3] hover:text-[#F5F5F2]'
                 }`}
             >
               {sev}
@@ -203,11 +208,11 @@ export const Monitoring: React.FC = () => {
       </div>
 
       {/* Live Stream Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#263449] rounded-xl overflow-hidden shadow-xs">
+      <div className="bg-[#111111] border border-[#2B2B2B] rounded-xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-[#263449] bg-slate-50 dark:bg-[#172033]/60 text-slate-500 dark:text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+              <tr className="border-b border-[#2B2B2B] bg-[#171717]/80 text-[#A8A8A3] font-mono text-[11px] uppercase tracking-wider">
                 <th className="py-3 px-4 font-medium">Timestamp (UTC)</th>
                 <th className="py-3 px-4 font-medium">Severity</th>
                 <th className="py-3 px-4 font-medium">Risk Score</th>
@@ -219,10 +224,10 @@ export const Monitoring: React.FC = () => {
                 <th className="py-3 px-4 text-right font-medium">Inspect</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#263449]/60">
+            <tbody className="divide-y divide-[#1E1E1E]">
               {filteredEvents.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-14 text-center text-slate-400 font-mono text-xs">
+                  <td colSpan={9} className="py-14 text-center text-[#A8A8A3] font-mono text-xs">
                     {search || severityFilter !== 'ALL'
                       ? 'No live events matching the active filter criteria.'
                       : 'Listening for incoming security telemetry on /ws/events...'}
@@ -232,10 +237,10 @@ export const Monitoring: React.FC = () => {
                 filteredEvents.map((ev, idx) => (
                   <tr
                     key={ev.id || idx}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                    className="hover:bg-[#171717] transition-colors group cursor-pointer"
                     onClick={() => navigate(`/events/${ev.id}`)}
                   >
-                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono text-[#A8A8A3] whitespace-nowrap">
                       {new Date(ev.timestamp).toLocaleTimeString()}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
@@ -245,32 +250,32 @@ export const Monitoring: React.FC = () => {
                       <span
                         className={
                           ev.risk_score >= 80
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-red-400'
                             : ev.risk_score >= 60
-                              ? 'text-amber-600 dark:text-amber-400'
+                              ? 'text-orange-400'
                               : ev.risk_score >= 35
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
+                                ? 'text-amber-400'
+                                : 'text-emerald-400'
                         }
                       >
                         {ev.risk_score.toFixed(1)}/100
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                    <td className="py-3 px-4 font-medium text-[#F5F5F2] whitespace-nowrap">
                       {ev.category}
                     </td>
-                    <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono text-[#F5F5F2] whitespace-nowrap">
                       {ev.source_ip}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono text-[#A8A8A3] whitespace-nowrap">
                       {ev.destination_ip}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-[#1A1A1A] border border-[#2B2B2B] text-[#F5F5F2] font-mono text-[11px]">
                         {ev.attack_class}
                       </span>
                     </td>
-                    <td className="py-3 px-4 max-w-xs truncate text-slate-500 dark:text-slate-400 font-mono">
+                    <td className="py-3 px-4 max-w-xs truncate text-[#A8A8A3] font-mono">
                       {ev.raw_log}
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -279,7 +284,7 @@ export const Monitoring: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/events/${ev.id}`);
                         }}
-                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="p-1 rounded hover:bg-[#222222] text-[#A8A8A3] hover:text-[#F5F5F2] transition-colors"
                         title="View Full Drilldown"
                       >
                         <ArrowUpRight className="w-4 h-4" />
