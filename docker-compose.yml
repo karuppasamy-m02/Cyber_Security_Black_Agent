@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: cybersentinel-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_PATH=/app/database/cybersentinel.db
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_DEFAULT_MODEL=qwen3:8b
+      - SECRET_KEY=CyberSentinelSuperSecretProductionKey2026!ChangeMe
+    volumes:
+      - db-data:/app/database
+      - ml-data:/app/ml-engine/models
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: cybersentinel-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
+  ml-data:
