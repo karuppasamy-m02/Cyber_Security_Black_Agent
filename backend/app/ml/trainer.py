@@ -3,14 +3,35 @@ import os
 import joblib
 import time
 from typing import Dict, Any, Tuple
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
-from xgboost import XGBClassifier
-from app.config import settings
-from app.ml.autoencoder import AutoencoderModel
-from app.ml.metrics import MLEvaluator
 import logging
 
 logger = logging.getLogger("cybersentinel.ml.trainer")
+
+from sklearn.ensemble import IsolationForest, HistGradientBoostingClassifier, RandomForestClassifier
+try:
+    from xgboost import XGBClassifier
+except Exception as e:
+    logger.warning(f"XGBoost OpenMP/native runtime not available ({e}), using Gradient Boosting shim.")
+    class XGBClassifier:
+        def __init__(self, n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, **kwargs):
+            self.model = HistGradientBoostingClassifier(
+                max_iter=n_estimators,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                random_state=random_state
+            )
+        def fit(self, X, y):
+            self.model.fit(X, y)
+            return self
+        def predict(self, X):
+            return self.model.predict(X)
+        def predict_proba(self, X):
+            return self.model.predict_proba(X)
+        def score(self, X, y):
+            return self.model.score(X, y)
+from app.config import settings
+from app.ml.autoencoder import AutoencoderModel
+from app.ml.metrics import MLEvaluator
 
 class MLTrainer:
     """

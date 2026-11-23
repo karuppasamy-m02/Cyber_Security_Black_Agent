@@ -49,6 +49,9 @@ export const Navbar: React.FC<NavbarProps> = () => {
   const getBreadcrumbs = () => {
     const path = location.pathname;
     if (path === '/dashboard') return [{ label: 'Overview' }, { label: 'Command Center' }];
+    if (path === '/agents/black' || path === '/black-agent') return [{ label: 'Agents' }, { label: 'Black Agent (Shield & Monitoring)' }];
+    if (path === '/agents/dark' || path === '/dark-agent') return [{ label: 'Agents' }, { label: 'Dark Agent (Deception & Control)' }];
+    if (path === '/agents') return [{ label: 'Agents' }, { label: 'Autonomous Agents' }];
     if (path === '/monitoring') return [{ label: 'Monitoring' }, { label: 'Live Telemetry' }];
     if (path === '/events') return [{ label: 'Monitoring' }, { label: 'Security Events' }];
     if (path.startsWith('/events/')) return [{ label: 'Monitoring' }, { label: 'Security Events', href: '/events' }, { label: 'Event Details' }];

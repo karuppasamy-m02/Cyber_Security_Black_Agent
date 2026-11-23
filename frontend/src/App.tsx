@@ -10,6 +10,9 @@ import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import { Agents } from './pages/Agents';
+import { BlackAgent } from './pages/BlackAgent';
+import { DarkAgent } from './pages/DarkAgent';
 import { Monitoring } from './pages/Monitoring';
 import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
@@ -79,6 +82,11 @@ export const App: React.FC = () => {
           >
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/agents" element={<Navigate to="/agents/black" replace />} />
+            <Route path="/agents/black" element={<BlackAgent />} />
+            <Route path="/black-agent" element={<Navigate to="/agents/black" replace />} />
+            <Route path="/agents/dark" element={<DarkAgent />} />
+            <Route path="/dark-agent" element={<Navigate to="/agents/dark" replace />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/:id" element={<EventDetail />} />

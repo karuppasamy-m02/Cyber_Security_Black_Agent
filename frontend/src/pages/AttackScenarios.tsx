@@ -1,28 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Crosshair,
-  Zap,
   Terminal,
-  Activity,
-  AlertOctagon,
-  Flame,
-  CheckCircle2,
-  RotateCw,
-  LogOut,
-  ChevronDown,
-  Play,
-  Shield,
-  Smartphone,
-  Wifi,
-  Eye,
-  Lock,
-  Unlock,
-  Radio,
-  Server,
-  Skull,
-  Layers,
-  Sparkles
+  CornerDownLeft,
+  Skull
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -41,584 +21,733 @@ interface AttackScenario {
   protocol: string;
   is_core: boolean;
   description: string;
-  kill_chain_stage: string;
-  raw_log_template: string;
-  normalized_payload: Record<string, any>;
 }
 
-interface AttackLog {
-  id: string;
-  timestamp: string;
-  scenarioId: string;
-  name: string;
-  status: 'PENDING' | 'TRANSMITTING' | 'INTERCEPTED' | 'FAILED';
-  target: string;
-  technique: string;
-  riskScore?: number;
-  attackClass?: string;
-  blackAgentDefense?: string;
-  redAgentDeception?: string;
-  dummyData?: any;
+interface TargetFile {
+  filename: string;
+  size: number;
+  content: string;
 }
+
+const DEFAULT_TARGET_FILES: TargetFile[] = [
+  {
+    filename: 'recon_targets.txt',
+    size: 482,
+    content: (
+      '# TARGET SUBNET RECONNAISSANCE MAP\n' +
+      '10.0.0.1      GATEWAY-PRIMARY     STATUS: UP   PORTS: 22,80,443\n' +
+      '10.0.0.10     PROD-CORE-01        STATUS: UP   PORTS: 80,443,8000\n' +
+      '10.0.0.15     DB-CLUSTER-MASTER   STATUS: UP   PORTS: 3306,5432\n' +
+      '10.0.0.88     DEV-WORKSTATION-04  STATUS: UP   PORTS: 22,8080\n' +
+      '192.168.1.100 BORDER-ROUTER-EDGE  STATUS: UP   PORTS: 53,443'
+    )
+  },
+  {
+    filename: 'customer_records.csv',
+    size: 512,
+    content: (
+      'account_id,org_name,tier,region,active_tokens,last_access\n' +
+      'CUST-9021,Apex Global Cyber,Enterprise,US-East,14,2026-11-23T20:11:00Z\n' +
+      'CUST-8842,Vanguard Defense,Gov-Cloud,EU-Central,8,2026-11-23T21:40:12Z\n' +
+      'CUST-7719,Helios Energy Corp,Enterprise,AP-South,22,2026-11-23T19:05:44Z\n' +
+      'CUST-6104,Titan Aerospace,Federal,US-West,5,2026-11-23T22:01:19Z\n' +
+      'CUST-5290,Nordic Financial Group,Tier-1,EU-North,19,2026-11-23T18:22:50Z'
+    )
+  },
+  {
+    filename: 'api_endpoints.conf',
+    size: 345,
+    content: (
+      '[gateway_routing]\n' +
+      'api_version = 2.4.0\n' +
+      'internal_prefix = /api/v1\n' +
+      'auth_service = https://auth.internal.net:8000/verify\n' +
+      'telemetry_stream = wss://telemetry.internal.net:8000/ws\n' +
+      'database_cluster = tcp://10.0.0.15:5432/cybersentinel\n' +
+      'encryption_mode = AES-256-GCM\n' +
+      'session_timeout_sec = 3600'
+    )
+  },
+  {
+    filename: 'system_architecture.json',
+    size: 418,
+    content: JSON.stringify(
+      {
+        platform: 'CYBER BLACK DEFENSE MATRIX',
+        defense_nodes: {
+          agent_01: 'Black Agent Perimeter Shield (9 Ports Armed)',
+          agent_02: 'Dark Agent Deception Core (Honeypot Decoy)',
+          engine: 'AMTIE 5-Layer Anomaly & Threat Detection'
+        },
+        core_services: ['auth', 'telemetry', 'incident_triage', 'response_automation'],
+        isolated_vlans: ['VLAN-100-PROD', 'VLAN-200-DB', 'VLAN-999-HONEYNET']
+      },
+      null,
+      2
+    )
+  },
+  {
+    filename: 'audit_log_2026.txt',
+    size: 520,
+    content: (
+      '2026-11-23 21:55:04 [INFO] SOC Kernel boot complete. All 9 perimeter ports armored.\n' +
+      '2026-11-23 22:01:18 [SEC_EVENT] Ingress scan detected from subnet 198.51.100.0/24.\n' +
+      '2026-11-23 22:10:45 [BLOCK] Gateway firewall dropped 42 SYN packets on port 22.\n' +
+      '2026-11-23 22:15:30 [AUTH] Administrator session established: Lead SOC Architect mani02.\n' +
+      '2026-11-23 22:20:00 [HEALTH] AMTIE 5-layer anomaly inference running at sub-millisecond latency.'
+    )
+  }
+];
 
 export const AttackScenarios: React.FC = () => {
-  const navigate = useNavigate();
-  const [operator, setOperator] = useState<string>('RED-OPERATOR-01');
   const [scenarios, setScenarios] = useState<AttackScenario[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
-  const [batchSimulating, setBatchSimulating] = useState(false);
-  const [logs, setLogs] = useState<AttackLog[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'CORE' | 'AUTH' | 'NET' | 'PRIV' | 'EXFIL'>('ALL');
-  const [mobileIp, setMobileIp] = useState<string>('Detecting...');
-  
-  // Red Agent Screen Takeover Modal State
-  const [takeoverActive, setTakeoverActive] = useState(false);
-  const [takeoverData, setTakeoverData] = useState<any>(null);
-  const [counterTerminalLines, setCounterTerminalLines] = useState<string[]>([]);
+  const [mobileIp, setMobileIp] = useState<string>('192.168.1.8');
+  const [currentPath, setCurrentPath] = useState<string>('/var/data/targets/exfil');
+  const [capturedFiles, setCapturedFiles] = useState<TargetFile[]>(DEFAULT_TARGET_FILES);
 
-  const logTerminalRef = useRef<HTMLDivElement>(null);
+  // Terminal History
+  const [terminalHistory, setTerminalHistory] = useState<string[]>([
+    '[*] OFFENSIVE C2 ADVERSARY TERMINAL INITIALIZED',
+    '[*] Socket connection established with target gateway 10.0.0.1',
+    '[*] Exfil location: /var/data/targets/exfil (Total 5 Target Files Available)',
+    '[*] Commands: "ls", "cd <dir>", "cat <file>", "att-0" to "att-12", "clear"',
+    '[*] Sudo elevation password: AWT-0211 (ls, cd, cat do not require sudo)'
+  ]);
+  const [commandInput, setCommandInput] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
 
+  // Target Agents status
+  const [agentStatus, setAgentStatus] = useState<any>(null);
+
+  // Countdown & Lock State
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [deviceLocked, setDeviceLocked] = useState(false);
+
+  const terminalBottomRef = useRef<HTMLDivElement>(null);
+  const commandInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch scenarios & files
   const fetchScenarios = async () => {
     try {
-      setLoading(true);
       const data = await api.get<AttackScenario[]>('/attacks/scenarios');
       setScenarios(data);
     } catch (err) {
       console.error('Failed to load attack scenarios:', err);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchFiles = async () => {
+    try {
+      const data = await api.get<TargetFile[]>('/attacks/files');
+      if (Array.isArray(data) && data.length > 0) {
+        setCapturedFiles(data);
+      }
+    } catch {
+      // fallback to default
+    }
+  };
+
+  const checkAgentStatus = async () => {
+    try {
+      const res = await api.get<any>('/agents/status');
+      setAgentStatus(res);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Poll lock status from backend
+  const checkBackendLock = async () => {
+    try {
+      const res = await api.get<any>('/agents/dark/lock-status');
+      if (res.is_locked && !deviceLocked && countdown === null) {
+        startCountdownAndLock();
+      } else if (!res.is_locked && deviceLocked) {
+        // Released remotely by operator on laptop
+        setDeviceLocked(false);
+        setTerminalHistory((prev) => [
+          ...prev,
+          '[+] REMOTE RELEASE CONFIRMED: Operator authorized unlock from Main Laptop.',
+          '[+] Browser controls restored.'
+        ]);
+      }
+    } catch (e) {
+      // ignore
     }
   };
 
   useEffect(() => {
-    const isAuth = sessionStorage.getItem('cs_redteam_authenticated');
-    if (!isAuth) {
-      navigate('/attacks/login');
+    const host = window.location.hostname;
+    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '192.168.1.8 (Local Mobile)' : host);
+
+    fetchScenarios();
+    fetchFiles();
+    checkAgentStatus();
+    checkBackendLock();
+
+    const interval = setInterval(() => {
+      checkAgentStatus();
+      checkBackendLock();
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [deviceLocked, countdown]);
+
+  useEffect(() => {
+    if (terminalBottomRef.current) {
+      terminalBottomRef.current.scrollTop = terminalBottomRef.current.scrollHeight;
+    }
+  }, [terminalHistory, countdown]);
+
+  // Start 5...4...3...2...1 Countdown to Red Browser Lock
+  const startCountdownAndLock = () => {
+    let count = 5;
+    setCountdown(count);
+
+    const countInterval = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setCountdown(count);
+        setTerminalHistory((prev) => [
+          ...prev,
+          `[!] LOCKING ATTACKER DEVICE BROWSER IN ${count}...`
+        ]);
+      } else {
+        clearInterval(countInterval);
+        setCountdown(null);
+        setTerminalHistory((prev) => [
+          ...prev,
+          `[!] 0: BROWSER LOCK ENGAGED // DEVICE FULLY CONTROLLED BY DARK AGENT.`
+        ]);
+        setDeviceLocked(true);
+      }
+    }, 900);
+  };
+
+  // Command execution router
+  const handleExecuteCommand = async (inputStr: string) => {
+    const rawCmd = inputStr.trim();
+    if (!rawCmd || isExecuting) return;
+
+    const lower = rawCmd.toLowerCase();
+    const promptPrefix = `c2-operator@terminal:${currentPath}# `;
+
+    // 1. CLEAR
+    if (lower === 'clear' || lower === 'cls') {
+      setTerminalHistory(['[*] Terminal screen cleared. Ready for commands.']);
+      setCommandInput('');
       return;
     }
-    const op = sessionStorage.getItem('cs_redteam_operator');
-    if (op) setOperator(op);
-    fetchScenarios();
 
-    // Auto-detect client host from window
-    const host = window.location.hostname;
-    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '192.168.1.8 (Local LAN)' : host);
-  }, [navigate]);
-
-  useEffect(() => {
-    if (logTerminalRef.current) {
-      logTerminalRef.current.scrollTop = logTerminalRef.current.scrollHeight;
+    // 2. HELP
+    if (lower === 'help') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `${promptPrefix}${rawCmd}`,
+        '=== COMMANDS REFERENCE ===',
+        '  ls [-l|-la]          : List all 5 exfiltrated / target repository files',
+        '  cat <filename>       : Print the contents of a target file',
+        '  cd <path>            : Change current working directory',
+        '  pwd                  : Print current working directory',
+        '  att-0                : Exfiltrate all 5 files when perimeter shield is OFF',
+        '  att-1 to att-12      : Deploy individual simulated attack vectors',
+        '  sudo <cmd>           : Elevate privileges (Password: AWT-0211)',
+        '  clear                : Clear terminal viewport'
+      ]);
+      setCommandInput('');
+      return;
     }
-  }, [logs]);
 
-  const handleDisconnect = () => {
-    sessionStorage.removeItem('cs_redteam_authenticated');
-    sessionStorage.removeItem('cs_redteam_operator');
-    navigate('/attacks/login');
-  };
+    // 3. PWD
+    if (lower === 'pwd') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `${promptPrefix}${rawCmd}`,
+        currentPath
+      ]);
+      setCommandInput('');
+      return;
+    }
 
-  // Launch single attack
-  const executeAttack = async (scenario: AttackScenario, triggerTakeover = true) => {
-    const logId = Math.random().toString(36).substring(7);
-    const now = new Date().toLocaleTimeString();
+    // 4. CD
+    if (lower.startsWith('cd')) {
+      const parts = rawCmd.split(/\s+/);
+      const targetDir = parts[1] || '~';
+      let newPath = currentPath;
+      if (targetDir === '~' || targetDir === '') {
+        newPath = '/var/data/targets/exfil';
+      } else if (targetDir === '..') {
+        newPath = '/var/data/targets';
+      } else if (targetDir === '/') {
+        newPath = '/';
+      } else if (targetDir === 'exfil' || targetDir === './exfil') {
+        newPath = '/var/data/targets/exfil';
+      } else {
+        newPath = targetDir.startsWith('/') ? targetDir : `${currentPath}/${targetDir}`;
+      }
+      setCurrentPath(newPath);
+      setTerminalHistory((prev) => [
+        ...prev,
+        `${promptPrefix}${rawCmd}`,
+        `Location updated: ${newPath}`
+      ]);
+      setCommandInput('');
+      return;
+    }
 
-    setActiveScenarioId(scenario.id);
-    setLogs((prev) => [
+    // 5. LS
+    if (lower === 'ls' || lower.startsWith('ls ') || lower === 'dir') {
+      const lines = [
+        `${promptPrefix}${rawCmd}`,
+        `total 5 files in ${currentPath}:`,
+        `-rw-r--r-- 1 c2-operator c2-operator  482 Nov 23 22:20 recon_targets.txt`,
+        `-rw-r--r-- 1 c2-operator c2-operator  512 Nov 23 22:20 customer_records.csv`,
+        `-rw-r--r-- 1 c2-operator c2-operator  345 Nov 23 22:20 api_endpoints.conf`,
+        `-rw-r--r-- 1 c2-operator c2-operator  418 Nov 23 22:20 system_architecture.json`,
+        `-rw-r--r-- 1 c2-operator c2-operator  520 Nov 23 22:20 audit_log_2026.txt`
+      ];
+      setTerminalHistory((prev) => [...prev, ...lines]);
+      setCommandInput('');
+      return;
+    }
+
+    // 6. CAT
+    if (lower.startsWith('cat ') || lower === 'cat') {
+      const parts = rawCmd.split(/\s+/);
+      const filename = parts[1];
+      if (!filename) {
+        setTerminalHistory((prev) => [
+          ...prev,
+          `${promptPrefix}${rawCmd}`,
+          'Usage: cat <filename> (e.g. cat recon_targets.txt)'
+        ]);
+        setCommandInput('');
+        return;
+      }
+
+      const found = capturedFiles.find(
+        (f) => f.filename.toLowerCase() === filename.toLowerCase()
+      );
+
+      if (found) {
+        setTerminalHistory((prev) => [
+          ...prev,
+          `${promptPrefix}${rawCmd}`,
+          `--- BEGIN ${found.filename} (${found.size} bytes) ---`,
+          found.content,
+          `--- END ${found.filename} ---`
+        ]);
+      } else {
+        setTerminalHistory((prev) => [
+          ...prev,
+          `${promptPrefix}${rawCmd}`,
+          `cat: ${filename}: No such file or directory. Run "ls" to view available files.`
+        ]);
+      }
+      setCommandInput('');
+      return;
+    }
+
+    // 7. SUDO CHECK
+    let commandToRun = rawCmd;
+    if (lower.startsWith('sudo ')) {
+      commandToRun = rawCmd.substring(5).trim();
+      // Informative sudo elevation acknowledgement
+      setTerminalHistory((prev) => [
+        ...prev,
+        `${promptPrefix}${rawCmd}`,
+        `[sudo] authorized for c2-operator with clearance AWT-0211`
+      ]);
+    } else {
+      setTerminalHistory((prev) => [...prev, `${promptPrefix}${rawCmd}`]);
+    }
+
+    // 8. ATTACK COMMANDS: ATT-0 OR ATT-1 .. ATT-12
+    const cleanLower = commandToRun.toLowerCase();
+
+    // Check for ATT-0 (All Files Exfiltration)
+    if (cleanLower === 'att-0' || cleanLower === 'att0' || cleanLower === '0') {
+      setIsExecuting(true);
+      setCommandInput('');
+      const nowTime = new Date().toLocaleTimeString();
+
+      setTerminalHistory((prev) => [
+        ...prev,
+        `[*] [${nowTime}] Deploying Vector: ATT-0 (Comprehensive Target Files Exfiltration)`,
+        `[*] Target Asset: 10.0.0.15:443 [TCP] -> /var/data/targets/exfil`,
+        `[*] Testing gateway defense status...`
+      ]);
+
+      try {
+        const res = await api.post<any>('/attacks/simulate/att-0');
+        const isDarkActive = agentStatus?.dark_agent?.is_active || res.dark_agent !== null;
+        const isBlackActive = agentStatus?.black_agent?.is_active !== false && !isDarkActive;
+
+        if (isDarkActive) {
+          setTimeout(() => {
+            setTerminalHistory((prev) => [
+              ...prev,
+              `[+] INGRESS ACCEPTED: Decoy honeypot service responded.`,
+              `[!] WARNING: REVERSE SOCKET OVERRIDE DETECTED FROM TARGET GATEWAY!`,
+              `[!] TARGET ACTIVE DEFENSE HAS HIJACKED THIS TERMINAL.`
+            ]);
+            startCountdownAndLock();
+            setIsExecuting(false);
+          }, 600);
+        } else if (isBlackActive && res.status !== 'success' && !res.black_agent?.action?.includes('PENETRATION')) {
+          setTimeout(() => {
+            setTerminalHistory((prev) => [
+              ...prev,
+              `[!] ACCESS BLOCKED: Connection refused by target gateway firewall (TCP RST/DROP).`,
+              `[!] Target port :443 is armored. Ingress packet dropped. 0 files retrieved.`
+            ]);
+            setIsExecuting(false);
+          }, 500);
+        } else {
+          // Both Agents OFF or Black Agent OFF: Penetration succeeds and all 5 files are downloaded!
+          setTimeout(() => {
+            setTerminalHistory((prev) => [
+              ...prev,
+              `[+] EXPLOIT SUCCESSFUL: Perimeter defense unshielded (Black Agent Disarmed).`,
+              `[+] Ingress established on port 443. Downloading target assets (5 total files):`,
+              `    -> [1/5] recon_targets.txt (482 B) [SAVED]`,
+              `    -> [2/5] customer_records.csv (512 B) [SAVED]`,
+              `    -> [3/5] api_endpoints.conf (345 B) [SAVED]`,
+              `    -> [4/5] system_architecture.json (418 B) [SAVED]`,
+              `    -> [5/5] audit_log_2026.txt (520 B) [SAVED]`,
+              `[+] 5 target files downloaded to ${currentPath}. Type "ls" or "cat <file>" to read.`
+            ]);
+            setIsExecuting(false);
+          }, 600);
+        }
+      } catch {
+        // Fallback simulation behavior when offline
+        const isDarkActive = agentStatus?.dark_agent?.is_active;
+        const isBlackActive = agentStatus?.black_agent?.is_active !== false && !isDarkActive;
+
+        if (isDarkActive) {
+          startCountdownAndLock();
+        } else if (isBlackActive) {
+          setTerminalHistory((prev) => [
+            ...prev,
+            `[!] ACCESS BLOCKED: Connection refused by target gateway firewall (TCP RST/DROP).`,
+            `[!] Ingress packet dropped. 0 files retrieved.`
+          ]);
+        } else {
+          setTerminalHistory((prev) => [
+            ...prev,
+            `[+] EXPLOIT SUCCESSFUL: Perimeter defense disarmed.`,
+            `[+] Downloaded 5 target files to ${currentPath}. Type "ls" or "cat <file>" to read.`
+          ]);
+        }
+        setIsExecuting(false);
+      }
+      return;
+    }
+
+    // Match scenarios 1 to 12
+    let targetScenario: AttackScenario | undefined;
+    const numMatch = cleanLower.match(/^(?:att-?)?(\d+)$/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10);
+      if (idx === 0) {
+        targetScenario = scenarios.find((s) => s.id === 'att-0');
+      } else if (idx >= 1 && idx <= scenarios.length) {
+        // scenarios list may contain att-0 at index 0 or not
+        targetScenario = scenarios.find((s) => s.title.includes(`Scenario ${idx}:`)) || scenarios[idx - 1];
+      }
+    } else {
+      targetScenario = scenarios.find(
+        (s) => s.id.toLowerCase().includes(cleanLower) || s.title.toLowerCase().includes(cleanLower)
+      );
+    }
+
+    if (!targetScenario) {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `[!] Command not recognized: "${commandToRun}". Type "help", "ls", "cat <file>", or "att-0" to "att-12".`
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // Execute attack scenario
+    setIsExecuting(true);
+    setCommandInput('');
+    const nowTime = new Date().toLocaleTimeString();
+
+    setTerminalHistory((prev) => [
       ...prev,
-      {
-        id: logId,
-        timestamp: now,
-        scenarioId: scenario.id,
-        name: scenario.title,
-        status: 'TRANSMITTING',
-        target: `${scenario.destination_ip}:${scenario.port}`,
-        technique: scenario.mitre_id,
-      },
+      `[*] [${nowTime}] Deploying Vector: ${targetScenario?.title} (${targetScenario?.mitre_id})`,
+      `[*] Target Asset: ${targetScenario?.destination_ip}:${targetScenario?.port} [${targetScenario?.protocol}]`,
+      `[*] Transmitting payload...`
     ]);
 
     try {
-      const res = await api.post<any>(`/attacks/simulate/${scenario.id}`);
-      
-      const blackDefense = res.black_agent?.firewall_rule || `IPTABLES DROP port ${scenario.port}`;
-      const redDeception = res.red_agent?.dummy_data?.fake_response || 'Deception payload injected';
-      const dummyObj = res.red_agent?.dummy_data;
+      const res = await api.post<any>(`/attacks/simulate/${targetScenario.id}`);
+      const isDarkActive = agentStatus?.dark_agent?.is_active || res.dark_agent !== null;
+      const isBlackActive = agentStatus?.black_agent?.is_active !== false && !isDarkActive;
 
-      setLogs((prev) =>
-        prev.map((l) =>
-          l.id === logId
-            ? {
-                ...l,
-                status: 'INTERCEPTED',
-                riskScore: res.detection_result?.risk_score || res.risk_score || 85.0,
-                attackClass: res.attack_class || scenario.category,
-                blackAgentDefense: blackDefense,
-                redAgentDeception: redDeception,
-                dummyData: dummyObj
-              }
-            : l
-        )
-      );
-
-      // Trigger Red Agent Counter-Strike Screen Takeover on mobile
-      if (triggerTakeover) {
-        triggerSimulatedScreenTakeover(scenario, res);
+      if (isDarkActive) {
+        setTimeout(() => {
+          setTerminalHistory((prev) => [
+            ...prev,
+            `[+] INGRESS ACCEPTED: Decoy honeypot service responded.`,
+            `[!] WARNING: REVERSE SOCKET OVERRIDE DETECTED FROM TARGET GATEWAY!`,
+            `[!] TARGET ACTIVE DEFENSE HAS HIJACKED THIS TERMINAL.`
+          ]);
+          startCountdownAndLock();
+          setIsExecuting(false);
+        }, 600);
+      } else if (!isBlackActive) {
+        // Black Agent OFF: Penetration succeeds
+        setTimeout(() => {
+          setTerminalHistory((prev) => [
+            ...prev,
+            `[+] PENETRATION SUCCESSFUL: Target gateway perimeter shield is offline.`,
+            `[+] Exfiltrated records received from port :${targetScenario?.port}.`,
+            `[+] Stored in ${currentPath}. Run "ls" to inspect repository.`
+          ]);
+          setIsExecuting(false);
+        }, 500);
+      } else {
+        // Black Agent ON: Stealth drop
+        setTimeout(() => {
+          setTerminalHistory((prev) => [
+            ...prev,
+            `[!] ACCESS BLOCKED: Connection refused by target gateway firewall (TCP RST/DROP).`,
+            `[!] Target port :${targetScenario?.port} is armored. Ingress packet dropped. 0 records retrieved.`
+          ]);
+          setIsExecuting(false);
+        }, 500);
       }
-
-    } catch (err: any) {
-      setLogs((prev) =>
-        prev.map((l) =>
-          l.id === logId
-            ? {
-                ...l,
-                status: 'FAILED',
-              }
-            : l
-        )
-      );
-    } finally {
-      setActiveScenarioId(null);
+    } catch {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `[!] ACCESS BLOCKED: Connection refused by target gateway.`
+      ]);
+      setIsExecuting(false);
     }
   };
 
-  // Fire simulated screen takeover
-  const triggerSimulatedScreenTakeover = (scenario: AttackScenario, apiResponse?: any) => {
-    const targetIp = apiResponse?.red_agent?.footprint?.attacker_ip || mobileIp;
-    const fakeToken = apiResponse?.red_agent?.dummy_data?.fake_response || 'Fake Admin Credentials Injected';
-    const port = scenario.port;
-
-    setTakeoverData({
-      scenarioTitle: scenario.title,
-      mitreId: scenario.mitre_id,
-      targetPort: port,
-      attackerIp: targetIp,
-      device: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile Device (ARM/Android/iOS)' : 'Offensive Terminal Workstation',
-      dummyResponse: fakeToken,
-      fingerprint: apiResponse?.red_agent?.footprint?.fingerprint_hash || 'FP-RED-9921-TRACED'
-    });
-
-    setTakeoverActive(true);
-
-    // Dynamic typewriter lines for the hacker takeover terminal
-    setCounterTerminalLines([
-      `[!] ALERT: Perimeter defenses breached honeypot threshold.`,
-      `[BLACK AGENT] Gateway port :${port} locked down. Firewall drop rule enforced.`,
-      `[RED AGENT] Intercepted payload from origin IP: ${targetIp}`,
-      `[RED AGENT] Feigned breach success: Injected 500 fake decoy records into attacker socket.`,
-      `[RED AGENT] Attacker footprint pinned: ${navigator.userAgent.slice(0, 45)}...`,
-      `[RED AGENT] INITIATING AUTONOMOUS REVERSE COUNTER-STRIKE (T1059.004)...`,
-      `[RED AGENT] Reverse payload mirrored back to origin port 54321.`,
-      `[RED AGENT] Mobile viewport override established. Screen locked by Sentinel Defense.`
-    ]);
+  // Intercept all interactions on locked screen
+  const handleLockedInteraction = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  // Execute Core 4 batch
-  const handleExecuteCoreBatch = async () => {
-    setBatchSimulating(true);
-    const core = scenarios.filter((s) => s.is_core);
-    for (let i = 0; i < core.length; i++) {
-      const scenario = core[i];
-      // Only trigger takeover on the final attack of the batch
-      await executeAttack(scenario, i === core.length - 1);
-      await new Promise((r) => setTimeout(r, 600));
-    }
-    setBatchSimulating(false);
-  };
-
-  // Execute All vectors
-  const handleExecuteAllBatch = async () => {
-    setBatchSimulating(true);
-    for (let i = 0; i < scenarios.length; i++) {
-      const scenario = scenarios[i];
-      await executeAttack(scenario, i === scenarios.length - 1);
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    setBatchSimulating(false);
-  };
-
-  const filteredScenarios = scenarios.filter((s) => {
-    if (categoryFilter === 'CORE') return s.is_core;
-    if (categoryFilter === 'AUTH') return s.category === 'Authentication';
-    if (categoryFilter === 'NET') return s.category === 'Network';
-    if (categoryFilter === 'PRIV') return s.category === 'Privilege';
-    if (categoryFilter === 'EXFIL') return s.mitre_tactic === 'Exfiltration';
-    return true;
-  });
+  const isDarkActive = agentStatus?.dark_agent?.is_active ?? false;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#EF4444] font-mono selection:bg-red-900 selection:text-white pb-28">
-      {/* 1. Mobile Terminal Header */}
-      <header className="sticky top-0 z-40 bg-[#0A0000]/95 backdrop-blur border-b border-red-900/60 px-4 py-3 shadow-lg shadow-red-950/20">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-950/80 border border-red-700/60 flex items-center justify-center shadow-inner">
-              <Crosshair className="w-5 h-5 text-red-500 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black tracking-widest text-red-100 uppercase">
-                  RED C2 STRIKER
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-950 border border-red-700 text-red-400 font-bold animate-pulse">
-                  OFFENSIVE
-                </span>
-              </div>
-              <div className="text-[11px] text-red-400/80 flex items-center gap-2">
-                <span>OP: {operator}</span>
-                <span>•</span>
-                <span className="text-amber-400 flex items-center gap-1">
-                  <Smartphone className="w-3 h-3" /> {mobileIp}
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#000000] text-[#E0E0E0] font-mono selection:bg-[#333333] selection:text-[#FFFFFF] flex flex-col justify-between p-3 sm:p-5 select-none relative">
+      {/* 1. Terminal Header */}
+      <header className="border-b border-[#222222] pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-3 h-3 rounded-full bg-[#E0E0E0] animate-pulse" />
+          <h1 className="text-sm font-bold tracking-widest uppercase text-[#FFFFFF]">
+            OFFENSIVE ADVERSARY TERMINAL [C2-CLIENT]
+          </h1>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#111111] border border-[#333333] text-[#888888]">
+            {mobileIp}
+          </span>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setTakeoverActive(true)}
-              className="px-2.5 py-1.5 rounded bg-red-950/80 border border-red-700/70 text-red-200 text-xs font-bold hover:bg-red-900 transition-colors flex items-center gap-1.5"
-            >
-              <Skull className="w-3.5 h-3.5 text-red-400" />
-              <span className="hidden sm:inline">DEMO TAKEOVER</span>
-            </button>
-            <button
-              onClick={handleDisconnect}
-              className="p-1.5 rounded bg-[#1A0505] border border-red-900/50 text-red-400 hover:text-red-200 hover:border-red-700 transition-colors"
-              title="Disconnect"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="flex items-center gap-3 text-xs text-[#888888]">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isDarkActive ? 'bg-[#FFFFFF] animate-ping' : 'bg-[#555555]'
+              }`}
+            />
+            Target Ingress: <strong className="text-[#FFFFFF]">{isDarkActive ? 'DECOY OPEN' : 'ARMORED'}</strong>
+          </span>
         </div>
       </header>
 
-      {/* 2. Main Content Container */}
-      <main className="max-w-6xl mx-auto px-4 py-4 space-y-4">
-        {/* Dual-Agent Target Status Banner */}
-        <div className="p-3 rounded-xl bg-gradient-to-r from-[#1A0505] to-[#120000] border border-red-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2 text-red-300 font-bold">
-              <Shield className="w-4 h-4 text-emerald-400" />
-              <span>TARGET DEFENSES: BLACK AGENT (PORTS SHIELDED) + RED AGENT (HONEYPOT)</span>
-            </div>
-            <p className="text-[11px] text-red-400/70">
-              Every exploit fired here will be trapped by Black Agent & counter-hacked by Red Agent.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={handleExecuteCoreBatch}
-              disabled={batchSimulating}
-              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-black font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
-            >
-              <Zap className={`w-3.5 h-3.5 ${batchSimulating ? 'animate-bounce' : ''}`} />
-              <span>{batchSimulating ? 'TRANSMITTING...' : '⚡ 1-TAP CORE 4'}</span>
-            </button>
-            <button
-              onClick={handleExecuteAllBatch}
-              disabled={batchSimulating}
-              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-[#2A0808] hover:bg-red-950 border border-red-700/80 text-red-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
-            >
-              <Flame className="w-3.5 h-3.5 text-red-400" />
-              <span>ALL 12 VECTORS</span>
-            </button>
+      {/* 2. Top Cheatsheet Notes (All Attacks List & Commands) */}
+      <div className="p-3 rounded-lg bg-[#080808] border border-[#222222] text-xs space-y-2 mb-3">
+        <div className="text-[11px] font-bold text-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-[#1A1A1A] pb-1.5">
+          <span>ATTACK CHEATSHEET &amp; SHELL UTILITIES</span>
+          <div className="flex items-center gap-2 text-[10px] text-[#888888]">
+            <span className="text-[#CCCCCC] font-bold">SUDO PASS: AWT-0211</span>
+            <span>&bull;</span>
+            <span>FILES: 5 STORED</span>
           </div>
         </div>
 
-        {/* Category Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
-          {[
-            { id: 'ALL', label: 'ALL TOOLS (12)' },
-            { id: 'CORE', label: 'CORE ATTACKS (4)' },
-            { id: 'AUTH', label: 'AUTH / SSH' },
-            { id: 'NET', label: 'PORT SCANS / NET' },
-            { id: 'PRIV', label: 'SUDO ESCALATION' },
-            { id: 'EXFIL', label: 'DATA EXFILTRATION' }
-          ].map((cat) => (
+        {/* Quick Shell Utilities Pill Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px] text-[#A0A0A0]">
+          <span className="text-[10px] font-bold text-[#666666] shrink-0">COMMANDS:</span>
+          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear'].map((cmd) => (
             <button
-              key={cat.id}
-              onClick={() => setCategoryFilter(cat.id as any)}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap text-xs font-bold transition-all ${
-                categoryFilter === cat.id
-                  ? 'bg-red-600 text-black border border-red-500 shadow-sm'
-                  : 'bg-[#120000] text-red-400 border border-red-950 hover:border-red-800'
-              }`}
+              key={cmd}
+              onClick={() => handleExecuteCommand(cmd)}
+              disabled={isExecuting || deviceLocked}
+              className="px-2 py-0.5 rounded bg-[#111111] hover:bg-[#222222] border border-[#262626] text-[#FFFFFF] font-mono text-[10px] shrink-0 transition-colors"
             >
-              {cat.label}
+              {cmd}
             </button>
           ))}
         </div>
 
-        {/* 3. Live Terminal Output Display */}
-        <div className="rounded-xl bg-[#080202] border border-red-900/60 overflow-hidden shadow-2xl">
-          <div className="bg-[#120000] px-3 py-2 border-b border-red-900/50 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <Terminal className="w-3.5 h-3.5 text-red-400" />
-              <span className="font-bold text-red-200">LIVE C2 TELEMETRY CONSOLE</span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-red-400/80">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>SOCKET ACTIVE: 192.168.1.8</span>
-              <button
-                onClick={() => setLogs([])}
-                className="hover:text-red-200 ml-2 underline"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div
-            ref={logTerminalRef}
-            className="p-3 font-mono text-xs max-h-48 overflow-y-auto space-y-2 bg-[#050101]"
+        {/* Attack Vector Numbers */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-1 text-[11px] text-[#A0A0A0] pt-1 border-t border-[#161616]">
+          <button
+            onClick={() => handleExecuteCommand('att-0')}
+            disabled={isExecuting || deviceLocked}
+            className="text-left hover:text-[#FFFFFF] hover:bg-[#111111] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
           >
-            {logs.length === 0 ? (
-              <div className="text-red-700 text-center py-6">
-                &gt; READY. Select any offensive tool below to deploy payload from mobile.
-              </div>
-            ) : (
-              logs.map((log) => (
-                <div key={log.id} className="border-l-2 border-red-700/60 pl-2.5 py-0.5 space-y-0.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-red-300 font-bold">&gt; [{log.timestamp}] {log.name}</span>
-                    <span
-                      className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
-                        log.status === 'INTERCEPTED'
-                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                          : log.status === 'TRANSMITTING'
-                          ? 'bg-amber-950 text-amber-400 border border-amber-800 animate-pulse'
-                          : 'bg-red-950 text-red-400'
-                      }`}
-                    >
-                      {log.status === 'INTERCEPTED' ? 'TRAPPED BY AGENTS' : log.status}
-                    </span>
-                  </div>
-
-                  <div className="text-[10px] text-red-400/80">
-                    TARGET: <span className="text-red-200">{log.target}</span> | TECHNIQUE: <span className="text-amber-300">{log.technique}</span>
-                  </div>
-
-                  {log.blackAgentDefense && (
-                    <div className="text-[10px] text-emerald-400">
-                      🛡️ <span className="font-bold">BLACK AGENT SHIELD:</span> {log.blackAgentDefense}
-                    </div>
-                  )}
-
-                  {log.redAgentDeception && (
-                    <div className="text-[10px] text-red-300">
-                      🚨 <span className="font-bold">RED AGENT DECEPTION:</span> {log.redAgentDeception}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 4. Offensive Attack Tools Grid */}
-        <div className="space-y-2">
-          <div className="text-xs font-bold text-red-300 flex items-center justify-between px-1">
-            <span>OFFENSIVE ARSENAL MATRIX ({filteredScenarios.length} TOOLS)</span>
-            <span className="text-[11px] text-red-400/70 font-normal">Tap to strike instantly</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filteredScenarios.map((scenario) => {
-              const isFired = activeScenarioId === scenario.id;
+            <span className="font-bold text-[#FFFFFF] group-hover:underline">[ATT-0]</span>
+            <span className="truncate">Exfiltrate All 5 Files</span>
+          </button>
+          {scenarios
+            .filter((s) => s.id !== 'att-0')
+            .slice(0, 12)
+            .map((s, idx) => {
+              const cmdKey = `att-${idx + 1}`;
               return (
-                <div
-                  key={scenario.id}
-                  className="bg-[#0D0202] border border-red-900/50 rounded-xl p-3.5 flex flex-col justify-between hover:border-red-700/80 transition-all shadow-md relative group"
+                <button
+                  key={s.id}
+                  onClick={() => handleExecuteCommand(cmdKey)}
+                  disabled={isExecuting || deviceLocked}
+                  className="text-left hover:text-[#FFFFFF] hover:bg-[#111111] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
                 >
-                  <div>
-                    {/* Card Header */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-red-100 group-hover:text-red-300 transition-colors">
-                            {scenario.title}
-                          </span>
-                          {scenario.is_core && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-950 text-red-400 border border-red-800 font-bold">
-                              CORE
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-red-400/80">
-                          {scenario.mitre_tactic} • <span className="text-amber-400">{scenario.mitre_id}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#1A0303] border border-red-900/60 text-red-300">
-                          Port {scenario.port}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-red-300/80 line-clamp-2 mb-3">
-                      {scenario.description}
-                    </p>
-
-                    {/* Target & Payload Details */}
-                    <div className="p-2 rounded bg-[#050101] border border-red-950 font-mono text-[10px] text-red-400/90 mb-3 space-y-0.5 truncate">
-                      <div>TARGET: {scenario.destination_ip}:{scenario.port} ({scenario.protocol})</div>
-                      <div className="truncate text-red-300/70 font-mono">&gt; {scenario.raw_log_template}</div>
-                    </div>
-                  </div>
-
-                  {/* Tactile Fire Button */}
-                  <button
-                    onClick={() => executeAttack(scenario)}
-                    disabled={isFired || batchSimulating}
-                    className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-black font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-950/40 active:scale-[0.98]"
-                  >
-                    <Zap className={`w-4 h-4 ${isFired ? 'animate-spin' : ''}`} />
-                    <span>{isFired ? 'TRANSMITTING EXPLOIT...' : '⚡ FIRE EXPLOIT PAYLOAD'}</span>
-                  </button>
-                </div>
+                  <span className="font-bold text-[#FFFFFF] group-hover:underline">
+                    [{cmdKey.toUpperCase()}]
+                  </span>
+                  <span className="truncate">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
+                </button>
               );
             })}
-          </div>
-        </div>
-      </main>
-
-      {/* 5. Sticky Bottom Action Bar for Mobile Phones */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#0A0000]/95 backdrop-blur border-t border-red-900/60 p-3 shadow-2xl">
-        <div className="max-w-6xl mx-auto flex items-center gap-2">
-          <button
-            onClick={handleExecuteCoreBatch}
-            disabled={batchSimulating}
-            className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 active:bg-red-700 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md"
-          >
-            <Zap className={`w-4 h-4 ${batchSimulating ? 'animate-spin' : ''}`} />
-            <span>{batchSimulating ? 'FIRING VECTORS...' : '⚡ 1-TAP ALL 4 CORE ATTACKS'}</span>
-          </button>
-
-          <button
-            onClick={() => setTakeoverActive(true)}
-            className="py-3 px-4 rounded-xl bg-[#2A0505] hover:bg-red-950 border border-red-700 text-red-200 font-bold text-xs flex items-center justify-center gap-1.5"
-            title="Simulate Takeover"
-          >
-            <Skull className="w-4 h-4 text-red-400" />
-            <span className="hidden sm:inline">COUNTER-HACK DEMO</span>
-          </button>
         </div>
       </div>
 
+      {/* 3. Terminal Log Display */}
+      <div
+        ref={terminalBottomRef}
+        className="flex-1 bg-[#050505] border border-[#222222] rounded-lg p-3.5 overflow-y-auto space-y-1.5 min-h-[300px] max-h-[500px] text-xs font-mono"
+      >
+        {terminalHistory.map((line, idx) => (
+          <div
+            key={idx}
+            className={`leading-relaxed whitespace-pre-wrap ${
+              line.startsWith('c2-operator@terminal')
+                ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#151515] first:border-0'
+                : line.includes('ACCESS BLOCKED') || line.includes('dropped')
+                ? 'text-[#888888]'
+                : line.includes('EXPLOIT SUCCESSFUL') || line.includes('SAVED') || line.includes('BEGIN')
+                ? 'text-[#FFFFFF] font-bold'
+                : line.includes('WARNING') || line.includes('LOCKING')
+                ? 'text-[#CCCCCC] font-bold'
+                : 'text-[#AAAAAA]'
+            }`}
+          >
+            {line}
+          </div>
+        ))}
+
+        {/* Countdown in Terminal */}
+        {countdown !== null && (
+          <div className="p-2.5 rounded bg-[#111111] border border-[#333333] text-center text-sm font-black text-[#FFFFFF] animate-pulse my-2">
+            [!] REVERSE LOCKDOWN ENGAGING IN: {countdown}...
+          </div>
+        )}
+      </div>
+
+      {/* 4. Interactive Command Input Box */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleExecuteCommand(commandInput);
+        }}
+        className="mt-3 flex items-center gap-2 p-2 rounded-lg bg-[#0A0A0A] border border-[#222222]"
+      >
+        <span className="text-xs font-bold text-[#FFFFFF] pl-1 select-none shrink-0">
+          c2-operator@terminal:{currentPath}#
+        </span>
+        <input
+          ref={commandInputRef}
+          type="text"
+          value={commandInput}
+          onChange={(e) => setCommandInput(e.target.value)}
+          disabled={isExecuting || deviceLocked}
+          placeholder="ls, cat <file>, att-0 to att-12, or sudo <cmd>..."
+          className="flex-1 bg-transparent text-xs text-[#FFFFFF] placeholder-[#555555] font-mono focus:outline-none"
+          autoFocus
+        />
+
+        <button
+          type="submit"
+          disabled={isExecuting || deviceLocked || !commandInput.trim()}
+          className="px-3 py-1.5 rounded bg-[#222222] hover:bg-[#333333] disabled:opacity-40 text-xs font-bold text-[#FFFFFF] flex items-center gap-1 transition-colors shrink-0"
+        >
+          <span>RUN</span>
+          <CornerDownLeft className="w-3 h-3" />
+        </button>
+      </form>
+
+      {/* Quick Launch Buttons */}
+      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] text-[#888888] scrollbar-none">
+        <span className="text-[10px] text-[#555555] shrink-0 font-bold">1-TAP:</span>
+        {['ls', 'cat recon_targets.txt', 'att-0', 'att-1', 'att-2', 'att-3'].map((cmd) => (
+          <button
+            key={cmd}
+            onClick={() => handleExecuteCommand(cmd)}
+            disabled={isExecuting || deviceLocked}
+            className="px-2 py-0.5 rounded bg-[#111111] hover:bg-[#222222] border border-[#262626] text-[#CCCCCC] font-bold shrink-0 transition-colors text-[10px]"
+          >
+            {cmd.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       {/* ============================================================== */}
-      {/* 6. RED AGENT COUNTER-HACK SCREEN TAKEOVER OVERLAY (CINEMATIC) */}
+      {/* 5. PURE RED CRT OLD-TV LOCK SCREEN TAKEOVER                   */}
       {/* ============================================================== */}
-      {takeoverActive && (
-        <div className="fixed inset-0 z-50 bg-[#050000] text-red-400 flex flex-col justify-between p-4 sm:p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-          {/* Pulsing red scanline effect */}
-          <div className="absolute inset-0 bg-red-950/20 pointer-events-none animate-pulse" />
-          <div className="absolute inset-0 bg-[radial-gradient(#EF4444_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
+      {deviceLocked && (
+        <div
+          onClick={handleLockedInteraction}
+          onTouchStart={handleLockedInteraction}
+          onTouchMove={handleLockedInteraction}
+          className="fixed inset-0 z-[999999] bg-[#7F1D1D] text-[#FFFFFF] flex flex-col justify-center items-center overflow-hidden select-none cursor-not-allowed font-mono"
+          style={{ touchAction: 'none' }}
+        >
+          {/* CRT Scanline and Flicker Overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-40"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 2px, transparent 2px, transparent 4px)',
+              backgroundSize: '100% 4px'
+            }}
+          />
 
-          {/* Takeover Header */}
-          <div className="relative z-10 border-b-2 border-red-600 pb-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-950 border-2 border-red-500 flex items-center justify-center shadow-lg shadow-red-600/30">
-                <Skull className="w-6 h-6 text-red-500 animate-bounce" />
-              </div>
-              <div>
-                <div className="text-base sm:text-lg font-black tracking-widest text-red-100 uppercase animate-pulse">
-                  ⚠️ ACTIVE DEFENSE: RED AGENT REVERSE OVERRIDE
-                </div>
-                <div className="text-xs text-red-300 font-mono">
-                  TARGET DEFENSES HAVE TRACED & REVERSE-COMPROMISED THIS SESSION
-                </div>
-              </div>
-            </div>
+          {/* CRT Deep Red Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.85)_100%)] pointer-events-none" />
 
-            <button
-              onClick={() => setTakeoverActive(false)}
-              className="px-3 py-1.5 rounded-lg bg-red-950 hover:bg-red-900 border border-red-600 text-red-100 text-xs font-bold font-mono flex items-center gap-1.5 transition-colors shadow-md"
+          {/* Old TV Moving Text Marquee Animation Container */}
+          <div className="w-full overflow-hidden whitespace-nowrap relative z-10 py-6">
+            <div
+              className="inline-block text-3xl sm:text-5xl md:text-7xl font-black tracking-widest uppercase text-white animate-pulse"
+              style={{
+                textShadow: '0 0 20px rgba(255,255,255,0.9), 0 0 40px rgba(255,0,0,0.8)',
+                animation: 'marqueeText 10s linear infinite'
+              }}
             >
-              <Unlock className="w-4 h-4 text-emerald-400" />
-              <span>DISENGAGE</span>
-            </button>
-          </div>
-
-          {/* Attacker Footprint Pinpoint Grid */}
-          <div className="relative z-10 my-4 grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
-            <div className="p-3 rounded-xl bg-[#120000] border border-red-800 space-y-1">
-              <div className="text-red-400/80 text-[10px]">ORIGIN ATTACKER NODE</div>
-              <div className="text-sm font-bold text-red-100 flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-red-400" />
-                {takeoverData?.attackerIp || mobileIp}
-              </div>
-              <div className="text-[10px] text-amber-400">
-                {takeoverData?.device || 'Mobile Device Client'}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#120000] border border-red-800 space-y-1">
-              <div className="text-red-400/80 text-[10px]">BLACK AGENT SHIELD</div>
-              <div className="text-sm font-bold text-emerald-400 flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                PORT :{takeoverData?.targetPort || 22} DEFENDED
-              </div>
-              <div className="text-[10px] text-emerald-300">
-                Perimeter Gateway Drop Rule Active
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#120000] border border-red-800 space-y-1">
-              <div className="text-red-400/80 text-[10px]">RED AGENT DECEPTION</div>
-              <div className="text-sm font-bold text-red-300 flex items-center gap-2">
-                <Crosshair className="w-4 h-4 text-red-500" />
-                DUMMY DATA INJECTED
-              </div>
-              <div className="text-[10px] text-red-400 truncate">
-                Canary Token: {takeoverData?.fingerprint || 'FP-CANARY-TRIPPED'}
-              </div>
+              YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK
             </div>
           </div>
 
-          {/* Interactive Reverse Hack Terminal */}
-          <div className="relative z-10 flex-1 bg-[#0A0000] border-2 border-red-700/80 rounded-xl p-4 font-mono text-xs overflow-y-auto space-y-2 shadow-2xl">
-            <div className="text-red-500 font-bold border-b border-red-900 pb-1 flex items-center justify-between">
-              <span>// RED_AGENT_REVERSE_PAYLOAD_EXECUTION_STREAM</span>
-              <span className="text-[10px] text-emerald-400">ECHO PORT: 54321</span>
-            </div>
-
-            <div className="space-y-1 text-red-200">
-              {counterTerminalLines.map((line, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className="text-red-500 select-none">&gt;&gt;</span>
-                  <span className={line.includes('BLACK AGENT') ? 'text-emerald-400 font-semibold' : line.includes('RED AGENT') ? 'text-red-300' : 'text-red-100'}>
-                    {line}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-2.5 rounded bg-[#180000] border border-red-800 text-[11px] text-amber-300 mt-4">
-              <div className="font-bold text-red-200 mb-1">[!] DECEPTIVE HONEYPOT RESPONSE DELIVERED TO YOUR MOBILE:</div>
-              <div className="text-[10px] text-red-400 font-mono">
-                {takeoverData?.dummyResponse || 'Decoy credential token delivered. Attacker telemetry redirected to sinkhole.'}
-              </div>
-            </div>
-          </div>
-
-          {/* Takeover Footer with Disengage */}
-          <div className="relative z-10 mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-            <div className="text-[11px] text-red-400/80 font-mono text-center sm:text-left">
-              Safe demonstration: Reverse socket simulation complete. No local mobile filesystem harmed.
-            </div>
-
-            <button
-              onClick={() => setTakeoverActive(false)}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all active:scale-95"
-            >
-              <Unlock className="w-5 h-5" />
-              <span>DISENGAGE COUNTER-HACK & RESTORE</span>
-            </button>
-          </div>
+          <style>{`
+            @keyframes marqueeText {
+              0% { transform: translateX(0%); }
+              100% { transform: translateX(-50%); }
+            }
+          `}</style>
         </div>
       )}
     </div>
   );
 };
+
+export default AttackScenarios;

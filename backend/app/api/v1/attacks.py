@@ -10,12 +10,114 @@ from app.models.incidents import Incident, IncidentEvent
 from app.models.response import ResponseAction
 from app.schemas.events import EventIngest
 from app.services.event_service import EventService
-from app.services.agents_service import black_agent, red_agent
+from app.services.agents_service import black_agent, dark_agent, red_agent
 from app.websocket.manager import ws_manager
 
 router = APIRouter(prefix="/attacks", tags=["Attack Scenarios & Simulations"])
 
+TARGET_EXFIL_FILES = [
+    {
+        "filename": "recon_targets.txt",
+        "size": 482,
+        "content": (
+            "# TARGET SUBNET RECONNAISSANCE MAP\n"
+            "10.0.0.1      GATEWAY-PRIMARY     STATUS: UP   PORTS: 22,80,443\n"
+            "10.0.0.10     PROD-CORE-01        STATUS: UP   PORTS: 80,443,8000\n"
+            "10.0.0.15     DB-CLUSTER-MASTER   STATUS: UP   PORTS: 3306,5432\n"
+            "10.0.0.88     DEV-WORKSTATION-04  STATUS: UP   PORTS: 22,8080\n"
+            "192.168.1.100 BORDER-ROUTER-EDGE  STATUS: UP   PORTS: 53,443"
+        )
+    },
+    {
+        "filename": "customer_records.csv",
+        "size": 512,
+        "content": (
+            "account_id,org_name,tier,region,active_tokens,last_access\n"
+            "CUST-9021,Apex Global Cyber,Enterprise,US-East,14,2026-11-23T20:11:00Z\n"
+            "CUST-8842,Vanguard Defense,Gov-Cloud,EU-Central,8,2026-11-23T21:40:12Z\n"
+            "CUST-7719,Helios Energy Corp,Enterprise,AP-South,22,2026-11-23T19:05:44Z\n"
+            "CUST-6104,Titan Aerospace,Federal,US-West,5,2026-11-23T22:01:19Z\n"
+            "CUST-5290,Nordic Financial Group,Tier-1,EU-North,19,2026-11-23T18:22:50Z"
+        )
+    },
+    {
+        "filename": "api_endpoints.conf",
+        "size": 345,
+        "content": (
+            "[gateway_routing]\n"
+            "api_version = 2.4.0\n"
+            "internal_prefix = /api/v1\n"
+            "auth_service = https://auth.internal.net:8000/verify\n"
+            "telemetry_stream = wss://telemetry.internal.net:8000/ws\n"
+            "database_cluster = tcp://10.0.0.15:5432/cybersentinel\n"
+            "encryption_mode = AES-256-GCM\n"
+            "session_timeout_sec = 3600"
+        )
+    },
+    {
+        "filename": "system_architecture.json",
+        "size": 418,
+        "content": (
+            "{\n"
+            '  "platform": "CYBER BLACK DEFENSE MATRIX",\n'
+            '  "defense_nodes": {\n'
+            '    "agent_01": "Black Agent Perimeter Shield (9 Ports Armed)",\n'
+            '    "agent_02": "Dark Agent Deception Core (Honeypot Decoy)",\n'
+            '    "engine": "AMTIE 5-Layer Anomaly & Threat Detection"\n'
+            '  },\n'
+            '  "core_services": ["auth", "telemetry", "incident_triage", "response_automation"],\n'
+            '  "isolated_vlans": ["VLAN-100-PROD", "VLAN-200-DB", "VLAN-999-HONEYNET"]\n'
+            "}"
+        )
+    },
+    {
+        "filename": "audit_log_2026.txt",
+        "size": 520,
+        "content": (
+            "2026-11-23 21:55:04 [INFO] SOC Kernel boot complete. All 9 perimeter ports armored.\n"
+            "2026-11-23 22:01:18 [SEC_EVENT] Ingress scan detected from subnet 198.51.100.0/24.\n"
+            "2026-11-23 22:10:45 [BLOCK] Gateway firewall dropped 42 SYN packets on port 22.\n"
+            "2026-11-23 22:15:30 [AUTH] Administrator session established: Lead SOC Architect mani02.\n"
+            "2026-11-23 22:20:00 [HEALTH] AMTIE 5-layer anomaly inference running at sub-millisecond latency."
+        )
+    }
+]
+
+@router.get("/files")
+def get_target_files():
+    """Returns the 5 demo exfiltration target files."""
+    return TARGET_EXFIL_FILES
+
 ATTACK_SCENARIOS = [
+    {
+        "id": "att-0",
+        "title": "Scenario 0: Target Repository Files Exfiltration",
+        "severity": "Critical",
+        "category": "Exfiltration",
+        "mitre_id": "T1041",
+        "mitre_technique": "Exfiltration Over C2 Channel",
+        "mitre_tactic": "Exfiltration",
+        "target_asset": "10.0.0.15 (Central Target Repository)",
+        "source_ip": "198.51.100.88",
+        "destination_ip": "10.0.0.15",
+        "port": 443,
+        "protocol": "TCP",
+        "is_core": True,
+        "description": "Exfiltrates all 5 corporate target data files from the repository when perimeter shield is disabled.",
+        "kill_chain_stage": "Actions on Objectives",
+        "expected_detection": "Layer 1 Large Egress + Layer 2 Anomaly + Layer 3 Exfiltration Classifier",
+        "recommended_action": "isolate_host",
+        "target_entity": "10.0.0.15",
+        "containment_guidance": "Sever outbound sessions and verify integrity of internal file repositories.",
+        "raw_log_template": "FLOW TCP src=10.0.0.15:443 dst=198.51.100.88:51224 BYTES_IN=1200 BYTES_OUT=32000000 PROTO=TCP",
+        "normalized_payload": {
+            "failed_attempts": 0,
+            "bytes_in": 1200,
+            "bytes_out": 32000000,
+            "dst_port": 443,
+            "distinct_ports_scanned": 1
+        }
+    },
     {
         "id": "ssh-brute-force",
         "title": "Scenario 1: SSH Brute Force Campaign",
@@ -381,11 +483,45 @@ async def simulate_attack_scenario(scenario_id: str, request: Request, db: Sessi
     client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else scenario["source_ip"])
     user_agent = request.headers.get("user-agent", "Unknown Mobile/Offensive Client")
 
-    # 1. Black Agent Autonomous Defense (Port & Gateway Fortress)
-    black_defense = black_agent.record_defense(scenario, client_ip)
+    # Check if Dark Agent is Active (Overrides Black Agent and locks attacker device)
+    is_dark_active = dark_agent.is_active
 
-    # 2. Red Agent Autonomous Deception, Footprint Tracking & Counter-Strike
-    red_response = red_agent.execute_deception_and_counter_strike(scenario, client_ip, user_agent)
+    if is_dark_active:
+        # Black Agent stands down to allow attacker into the Dark Agent trap
+        black_defense = black_agent.record_defense(scenario, client_ip, bypassed_by_dark=True)
+        # Dark Agent serves honeypot decoy data and locks device browser
+        dark_response = dark_agent.lock_attacker_device(scenario, client_ip, user_agent)
+    elif not black_agent.is_active:
+        # Black Agent is manually switched OFF: attack succeeds and demo data is sent to attacker!
+        black_defense = {
+            "id": str(uuid.uuid4())[:8],
+            "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+            "target_port": scenario.get("port", 80),
+            "blocked_ip": client_ip,
+            "attack_type": scenario.get("title", "Attack"),
+            "mitre_id": scenario.get("mitre_id", "T1000"),
+            "action": "SHIELD_OFFLINE_PENETRATION_PERMITTED",
+            "firewall_rule": "NONE (Black Agent Shield Deactivated by Operator)",
+            "defense_layer": "Perimeter Disarmed"
+        }
+        dark_response = {
+            "dummy_data": {
+                "status": "PENETRATION_SUCCESSFUL_PERIMETER_DOWN",
+                "files_count": len(TARGET_EXFIL_FILES),
+                "files": [f["filename"] for f in TARGET_EXFIL_FILES]
+            },
+            "files": TARGET_EXFIL_FILES,
+            "footprint": {
+                "attacker_ip": client_ip,
+                "target_port": scenario.get("port", 80),
+                "attack_vector": scenario.get("title", "Attack"),
+                "trace_status": "PERIMETER_UNARMED"
+            }
+        }
+    else:
+        # Black Agent Active: Perimeter defense drops and neutralizes attack
+        black_defense = black_agent.record_defense(scenario, client_ip, bypassed_by_dark=False)
+        dark_response = None
 
     # Create ingestion payload
     ingest_payload = EventIngest(
@@ -443,12 +579,10 @@ async def simulate_attack_scenario(scenario_id: str, request: Request, db: Sessi
     try:
         await ws_manager.broadcast_event({
             "type": "DUAL_AGENT_ACTION",
+            "is_dark_active": is_dark_active,
             "black_agent": black_defense,
-            "red_agent": {
-                "dummy_data": red_response["dummy_data"],
-                "footprint": red_response["footprint"],
-                "counter_strike": red_response["counter_strike"]
-            }
+            "dark_agent": dark_response,
+            "red_agent": dark_response
         })
     except Exception:
         pass
@@ -481,5 +615,6 @@ async def simulate_attack_scenario(scenario_id: str, request: Request, db: Sessi
             "tactic": scenario["mitre_tactic"]
         },
         "black_agent": black_defense,
-        "red_agent": red_response
+        "dark_agent": dark_response,
+        "red_agent": dark_response
     }

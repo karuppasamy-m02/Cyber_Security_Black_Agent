@@ -7,83 +7,29 @@ from app.websocket.manager import ws_manager
 logger = logging.getLogger("cybersentinel.agents")
 
 # -------------------------------------------------------------
-# DUMMY DATA DECEPTION TEMPLATES (FOR RED AGENT HONEYPOT)
+# DEMO DATA DECEPTION TEMPLATES (5 TOTAL TARGET FILES)
 # -------------------------------------------------------------
-DECEPTION_DUMMY_DATA = {
-    "ssh-brute-force": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "DECOY_CREDENTIAL_FEED",
-        "fake_response": "Login accepted on decoy gateway node 3. Session token: DECOY-AUTH-77319-XF",
-        "decoy_files": [
-            "/etc/shadow.decoy (root:$6$decoy_salt$981hjasd7812kjh:19420:0:99999:7:::)",
-            "/root/.ssh/authorized_keys (CANARY_TOKEN_9921_ACTIVATED)"
-        ],
-        "honey_trap_triggered": "CANARY_TOKEN_ACCESSED"
-    },
-    "internal-port-scan": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "VIRTUAL_HONEYNET_PORTS",
-        "fake_response": "Port scan acknowledged. 19 virtual honeypot services spawned with synthetic banners.",
-        "decoy_services": [
-            {"port": 21, "banner": "ProFTPD 1.3.5 Decoy Honeypot"},
-            {"port": 80, "banner": "Apache/2.4.41 Decoy Enterprise Portal"},
-            {"port": 3306, "banner": "5.7.33-decoy-MySQL Canary Database"},
-            {"port": 8080, "banner": "Jenkins 2.235 Decoy Automation"}
-        ],
-        "honey_trap_triggered": "NETWORK_SWEEP_GEO_TRAPPED"
-    },
-    "data-exfiltration": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "POISONED_TELEMETRY_INJECTION",
-        "fake_response": "Exfiltration channel hijacked. Injected 24.8 MB of poisoned dummy records with digital watermarks.",
-        "decoy_files": [
-            "financial_q4_decoy_CANARY.xlsx (Contains tracking beacons)",
-            "customer_database_dump_synthetic.sql (Watermarked fake PII)"
-        ],
-        "honey_trap_triggered": "WATERMARK_BEACON_DISPATCHED"
-    },
-    "privilege-escalation": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "SANDBOXED_ROOT_CONTAINMENT",
-        "fake_response": "Sudo request granted inside sandboxed deception container. Attacker confined to virtual jail.",
-        "decoy_shell": "root@prod-decoy-sandbox:~# (Jailed environment: UID 0 mock root)",
-        "honey_trap_triggered": "CONTAINER_JAIL_ENGAGED"
-    },
-    "sql-injection": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "SYNTHETIC_DATABASE_DUMP",
-        "fake_response": "SQL query returned 500 synthetic decoy records. Canary tokens embedded.",
-        "decoy_tables": [
-            {"username": "admin_honey", "password_hash": "$2b$12$decoyHashForAttackerTracer999", "role": "sysadmin"},
-            {"username": "cfo_canary", "password_hash": "$2b$12$canaryHashBeaconTrigger100", "role": "finance"}
-        ],
-        "honey_trap_triggered": "SQL_CANARY_TRIPWIRE"
-    },
-    "ransomware-sim": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "SHADOW_CANARY_TRAP",
-        "fake_response": "Simulated ransomware redirected to isolated shadow volume. 0 production assets affected.",
-        "decoy_files": [
-            "/decoy_shares/corporate_docs_canary.bin",
-            "/decoy_shares/database_backups_canary.bak"
-        ],
-        "honey_trap_triggered": "RANSOM_SHADOW_LOCKDOWN"
-    },
-    "ddos-syn-flood": {
-        "status": "ACCEPTED_HONEYPOT",
-        "deception_type": "SINKHOLE_TRAFFIC_DEFLECTION",
-        "fake_response": "Volumetric traffic absorbed by Red Agent scrubbing sinkhole. Origin socket mapped.",
-        "sinkhole_node": "198.51.100.254 [BLACK_HOLE_SINKHOLE]",
-        "honey_trap_triggered": "SYN_FLOOD_SINKHOLED"
-    }
+DARK_DEMO_DATA = {
+    "status": "ACCEPTED_HONEYPOT",
+    "deception_type": "SYNTHETIC_CANARY_DECOY",
+    "message": "Decoy container active",
+    "target_files_count": 5,
+    "decoy_files": [
+        "recon_targets.txt",
+        "customer_records.csv",
+        "api_endpoints.conf",
+        "system_architecture.json",
+        "audit_log_2026.txt"
+    ]
 }
 
 class BlackAgentService:
     """
-    AGENT 1: BLACK AGENT - The Autonomous Shield & Gateway Fortress.
-    Protects all perimeter gateways, all core network ports, and detects/blocks attacks.
+    AGENT 1: BLACK AGENT - The Autonomous Shield & Perimeter Guardian.
+    Only protects all perimeter gateways and monitors all security details.
     """
     def __init__(self):
+        self.is_active = True
         self.status = "ONLINE & SHIELD ARMED"
         self.protected_ports = [
             {"port": 22, "service": "SSH / Remote Mgmt", "status": "SECURED", "policy": "DROP_UNAUTH"},
@@ -99,12 +45,42 @@ class BlackAgentService:
         self.total_attacks_blocked = 0
         self.recent_blocks: List[Dict[str, Any]] = []
 
-    def record_defense(self, scenario: Dict[str, Any], client_ip: str) -> Dict[str, Any]:
-        self.total_attacks_blocked += 1
+    def toggle_shield(self, activate: Optional[bool] = None) -> Dict[str, Any]:
+        if activate is None:
+            self.is_active = not self.is_active
+        else:
+            self.is_active = bool(activate)
+
+        self.status = "ONLINE & SHIELD ARMED" if self.is_active else "OFFLINE (PERIMETER SHIELD DOWN)"
+        return {
+            "success": True,
+            "is_active": self.is_active,
+            "status": self.status,
+            "message": "Black Agent perimeter shield activated." if self.is_active else "Black Agent perimeter shield deactivated. Attacks will succeed and demo data will be served."
+        }
+
+    def record_defense(self, scenario: Dict[str, Any], client_ip: str, bypassed_by_dark: bool = False) -> Dict[str, Any]:
         port = scenario.get("port", 80)
+        now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+
+        if bypassed_by_dark:
+            action = {
+                "id": str(uuid.uuid4())[:8],
+                "timestamp": now_str,
+                "target_port": port,
+                "blocked_ip": client_ip or scenario.get("source_ip", "Unknown"),
+                "attack_type": scenario.get("title", "Cyber Attack"),
+                "mitre_id": scenario.get("mitre_id", "T1000"),
+                "action": "GATEWAY_BYPASS_AUTHORIZED_BY_DARK_AGENT",
+                "firewall_rule": f"ALLOW_IN_TO_DECOY_HONEYPOT (Port {port})",
+                "defense_layer": "Dark Agent Honey-Net Routing (Black Agent Suppressed)"
+            }
+            return action
+
+        self.total_attacks_blocked += 1
         action = {
             "id": str(uuid.uuid4())[:8],
-            "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+            "timestamp": now_str,
             "target_port": port,
             "blocked_ip": client_ip or scenario.get("source_ip", "Unknown"),
             "attack_type": scenario.get("title", "Cyber Attack"),
@@ -118,11 +94,20 @@ class BlackAgentService:
             self.recent_blocks.pop()
         return action
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self, is_dark_active: bool = False) -> Dict[str, Any]:
+        if not self.is_active:
+            effective_status = "OFFLINE (PERIMETER SHIELD DOWN)"
+        elif is_dark_active:
+            effective_status = "STANDBY / SUPPRESSED BY DARK AGENT"
+        else:
+            effective_status = "ONLINE & SHIELD ARMED"
+
         return {
             "name": "BLACK AGENT",
-            "role": "Autonomous Shield & Gateway Fortress",
-            "status": self.status,
+            "role": "Autonomous Defensive Shield & Perimeter Guardian",
+            "is_active": self.is_active,
+            "status": effective_status,
+            "is_suppressed": is_dark_active,
             "total_blocked": self.total_attacks_blocked,
             "protected_ports": self.protected_ports,
             "active_policies": [
@@ -130,25 +115,67 @@ class BlackAgentService:
                 "REALTIME_IPTABLES_DROP",
                 "PORT_ZERO_TRUST_VERIFICATION",
                 "AMTIE_5_LAYER_AI_ENFORCEMENT"
+            ] if self.is_active and not is_dark_active else [
+                "STANDBY: GATEWAY DEFENSES DIVERTED TO DARK HONEYPOT" if is_dark_active else "SHIELD DOWN: UNAUTHORIZED INGRESS PERMITTED",
+                "ZERO-TRUST CANARY ROUTING ENGAGED"
             ],
             "recent_blocks": self.recent_blocks[:5]
         }
 
 
-class RedAgentService:
+class DarkAgentService:
     """
-    AGENT 2: RED AGENT - Autonomous Deception, Footprint Tracker & Reverse Counter-Strike.
-    Accepts attacks into honeypot, feeds realistic dummy data, traces the attacker's footprint,
-    and executes an autonomous Counter-Strike payload back to the attacker!
+    AGENT 2: DARK AGENT (Formerly Red Agent).
+    Secured by Dark Code: Mani02.
+    When activated:
+      1. Stops/suppresses Black Agent defenses to allow attackers into the decoy honey-net.
+      2. Serves synthetic decoy target files to contained attackers.
+      3. Traces attacker footprint and path (IP, user agent, mobile/laptop device, ports).
+      4. Deploys mini-attack counter-strike: LOCKS the attacker device's browser.
+      5. Device browser remains locked until manually released by operator (Mani02) or Dark Agent is turned OFF.
     """
+    DARK_CODE = "Mani02"
+
     def __init__(self):
-        self.status = "HONEYPOT & COUNTER-STRIKE ARMED"
+        self.is_active = False
+        self.status = "OFFLINE & DORMANT"
         self.total_deceptions_served = 0
         self.total_counter_strikes = 0
+        self.locked_devices: Dict[str, Dict[str, Any]] = {}
         self.tracked_footprints: List[Dict[str, Any]] = []
         self.counter_strikes: List[Dict[str, Any]] = []
 
-    def execute_deception_and_counter_strike(
+    def verify_code(self, code: str) -> bool:
+        return code.strip() == self.DARK_CODE
+
+    def toggle_activation(self, code: str, activate: Optional[bool] = None) -> Dict[str, Any]:
+        if not self.verify_code(code):
+            return {
+                "success": False,
+                "error": "INVALID_DARK_CODE",
+                "message": "Access Denied: Invalid Dark Agent Authorization Code."
+            }
+
+        if activate is None:
+            self.is_active = not self.is_active
+        else:
+            self.is_active = bool(activate)
+
+        if self.is_active:
+            self.status = "DARK AGENT ACTIVE (Black Agent Suppressed - Honey Decoy Engaged)"
+        else:
+            self.status = "OFFLINE & DORMANT (Black Agent Resumed Shield)"
+            # Automatically release all locked devices when Dark Agent is turned off
+            self.release_all_devices()
+
+        return {
+            "success": True,
+            "is_active": self.is_active,
+            "status": self.status,
+            "message": "Dark Agent activated. Black Agent defenses paused." if self.is_active else "Dark Agent deactivated. Black Agent perimeter shield restored and all attacker devices released."
+        }
+
+    def lock_attacker_device(
         self,
         scenario: Dict[str, Any],
         client_ip: str,
@@ -157,66 +184,170 @@ class RedAgentService:
         self.total_deceptions_served += 1
         self.total_counter_strikes += 1
 
-        scenario_id = scenario.get("id", "generic-attack")
         now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+        is_mobile = any(k in user_agent.lower() for k in ["android", "iphone", "mobile", "ipad"])
+        device_type = "Mobile Device (ARM/Android/iOS)" if is_mobile else "Laptop / Workstation Client"
+        port = scenario.get("port", 80)
+        mitre_id = scenario.get("mitre_id", "T1059.004")
+        attack_title = scenario.get("title", "Offensive Exploitation")
 
-        # 1. Fetch or generate dummy data response
-        dummy_info = DECEPTION_DUMMY_DATA.get(scenario_id, {
-            "status": "ACCEPTED_HONEYPOT",
-            "deception_type": "SYNTHETIC_CANARY_PAYLOAD",
-            "fake_response": "Attack payload accepted into decoy honeypot. Synthetic data stream returned.",
-            "decoy_files": ["decoy_system_log.canary", "mock_telemetry_dump.enc"],
-            "honey_trap_triggered": "CANARY_TOKEN_ACTIVATED"
-        })
+        fingerprint_hash = f"FP-DARK-{uuid.uuid4().hex[:10].upper()}"
+        trace_path = f"{client_ip} -> Gateway Firewall (Bypassed) -> Honeypot Node :{port} -> Dark Agent Trap Core"
 
-        # 2. Extract and record Attacker Footprint
-        device_type = "Mobile Device" if any(k in user_agent.lower() for k in ["android", "iphone", "mobile"]) else "Desktop Workstation"
+        # Honeypot decoy demo data
+        dummy_info = {
+            **DARK_DEMO_DATA,
+            "timestamp": now_str,
+            "target_port": port,
+            "status": "HONEYPOT_SYNTHETIC_DATA_SERVED"
+        }
+
+        # Attacker Footprint
         footprint = {
             "id": str(uuid.uuid4())[:8],
             "timestamp": now_str,
-            "attacker_ip": client_ip or scenario.get("source_ip", "192.168.1.8"),
-            "target_port": scenario.get("port", 80),
+            "attacker_ip": client_ip or "192.168.1.8",
+            "target_port": port,
             "target_asset": scenario.get("target_asset", "Core Infrastructure"),
             "user_agent": user_agent or "Mozilla/5.0 (Mobile Offensive Client)",
             "device_type": device_type,
-            "attack_vector": scenario.get("title", "Host Exploit"),
-            "mitre_id": scenario.get("mitre_id", "T1000"),
-            "trace_status": "100% IDENTIFIED & PINPOINTED",
-            "fingerprint_hash": f"FP-{uuid.uuid4().hex[:12].upper()}"
+            "attack_vector": attack_title,
+            "mitre_id": mitre_id,
+            "trace_status": "LOCKED & CONTROLLED BY DARK AGENT",
+            "fingerprint_hash": fingerprint_hash,
+            "trace_path": trace_path
         }
         self.tracked_footprints.insert(0, footprint)
-        if len(self.tracked_footprints) > 20:
+        if len(self.tracked_footprints) > 25:
             self.tracked_footprints.pop()
 
-        # 3. Formulate Counter-Strike
-        counter_exploit = {
+        # Mini Attack Device Lock Record
+        device_key = client_ip or "192.168.1.8"
+        device_lock_entry = {
+            "device_key": device_key,
+            "client_ip": device_key,
+            "device_type": device_type,
+            "user_agent": user_agent,
+            "locked_at": now_str,
+            "target_port": port,
+            "attack_vector": attack_title,
+            "mitre_id": mitre_id,
+            "fingerprint_hash": fingerprint_hash,
+            "trace_path": trace_path,
+            "is_locked": True,
+            "status": "LOCKED_BY_DARK_AGENT"
+        }
+        self.locked_devices[device_key] = device_lock_entry
+
+        # Counter-Strike Record
+        counter_strike = {
             "id": str(uuid.uuid4())[:8],
             "timestamp": now_str,
-            "target_attacker_ip": client_ip or scenario.get("source_ip", "192.168.1.8"),
-            "counter_technique": f"REVERSE-T{scenario.get('mitre_id', 'T1059')}",
-            "counter_vector": f"Active Counter-Offensive: Reverse Socket Hijack & Screen Override",
-            "payload_injected": f"REVERSE_PAYLOAD_DEPLOY: Mirroring {scenario.get('category')} vector back to origin port {scenario.get('port', 80)}",
-            "execution_status": "COUNTER_EXPLOIT_DEPLOYED",
+            "target_attacker_ip": device_key,
+            "counter_technique": f"DARK-LOCK-{mitre_id}",
+            "counter_vector": "Mini Attack: Remote Browser Takeover & Lock",
+            "payload_injected": "LOCK_DEVICE_BROWSER: Screen Takeover Active",
+            "execution_status": "DEVICE_CONTROLLED",
             "screen_takeover_triggered": True,
-            "attacker_device": device_type
+            "attacker_device": device_type,
+            "device_locked": True
         }
-        self.counter_strikes.insert(0, counter_exploit)
-        if len(self.counter_strikes) > 20:
+        self.counter_strikes.insert(0, counter_strike)
+        if len(self.counter_strikes) > 25:
             self.counter_strikes.pop()
 
         return {
             "dummy_data": dummy_info,
             "footprint": footprint,
-            "counter_strike": counter_exploit
+            "counter_strike": counter_strike,
+            "device_lock": device_lock_entry
+        }
+
+    def release_device(self, device_key: str, code: Optional[str] = None) -> Dict[str, Any]:
+        if code and not self.verify_code(code):
+            return {"success": False, "error": "INVALID_DARK_CODE", "message": "Invalid Dark Code."}
+
+        # Look up device by key or IP
+        matched_key = None
+        for k in self.locked_devices.keys():
+            if k == device_key or self.locked_devices[k].get("client_ip") == device_key:
+                matched_key = k
+                break
+
+        if matched_key and matched_key in self.locked_devices:
+            self.locked_devices[matched_key]["is_locked"] = False
+            self.locked_devices[matched_key]["status"] = "RELEASED_BY_OPERATOR"
+            self.locked_devices[matched_key]["released_at"] = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+            return {
+                "success": True,
+                "device_key": matched_key,
+                "message": f"Attacker device {matched_key} has been released from Dark Control."
+            }
+
+        return {
+            "success": False,
+            "error": "DEVICE_NOT_FOUND",
+            "message": f"No active device found with identifier {device_key}."
+        }
+
+    def release_all_devices(self) -> Dict[str, Any]:
+        now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+        count = 0
+        for k in list(self.locked_devices.keys()):
+            if self.locked_devices[k].get("is_locked", False):
+                self.locked_devices[k]["is_locked"] = False
+                self.locked_devices[k]["status"] = "RELEASED_BY_OPERATOR"
+                self.locked_devices[k]["released_at"] = now_str
+                count += 1
+        return {
+            "success": True,
+            "count": count,
+            "message": f"All {count} attacker devices have been released."
+        }
+
+    def check_device_lock_status(self, client_ip: str) -> Dict[str, Any]:
+        # If Dark Agent is not even active, device is never locked
+        if not self.is_active:
+            return {
+                "is_locked": False,
+                "dark_agent_active": False,
+                "status": "UNLOCKED"
+            }
+
+        # Check matched device
+        matched = None
+        for k, v in self.locked_devices.items():
+            if (k == client_ip or v.get("client_ip") == client_ip) and v.get("is_locked", False):
+                matched = v
+                break
+
+        if matched:
+            return {
+                "is_locked": True,
+                "dark_agent_active": True,
+                "device_info": matched,
+                "status": "LOCKED_BY_DARK_AGENT"
+            }
+
+        return {
+            "is_locked": False,
+            "dark_agent_active": True,
+            "status": "STANDBY_UNLOCKED"
         }
 
     def get_status(self) -> Dict[str, Any]:
+        active_locked = [v for v in self.locked_devices.values() if v.get("is_locked", False)]
+        all_devices = list(self.locked_devices.values())
         return {
-            "name": "RED AGENT",
-            "role": "Autonomous Honeypot, Deception & Counter-Strike",
+            "name": "DARK AGENT",
+            "role": "Autonomous Honeypot Deception & Attacker Device Control",
+            "is_active": self.is_active,
             "status": self.status,
+            "dark_code_required": True,
             "total_deceptions": self.total_deceptions_served,
             "total_counter_strikes": self.total_counter_strikes,
+            "active_locked_count": len(active_locked),
+            "locked_devices": all_devices[:10],
             "recent_footprints": self.tracked_footprints[:5],
             "recent_counter_strikes": self.counter_strikes[:5]
         }
@@ -224,4 +355,6 @@ class RedAgentService:
 
 # Singleton instances
 black_agent = BlackAgentService()
-red_agent = RedAgentService()
+dark_agent = DarkAgentService()
+# Alias for backwards compatibility
+red_agent = dark_agent

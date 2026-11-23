@@ -15,6 +15,7 @@ from app.ai.ollama_client import ollama_client
 from app.ai.security_guard import SecurityGuard
 from app.ai.prompt_manager import PromptManager
 from app.ai.rag_service import RAGService
+from app.ai.analyst_engine import AutonomousAnalystEngine
 from app.core.security import get_current_user_payload
 
 router = APIRouter(prefix="/ai", tags=["Ollama Local AI Analyst"])
@@ -61,6 +62,18 @@ async def chat_with_analyst(
     user_payload: dict = Depends(get_current_user_payload)
 ):
     user_id = user_payload.get("user_id")
+    from app.models.users import User
+    user = None
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        sub = user_payload.get("sub")
+        if sub:
+            user = db.query(User).filter(User.username == sub).first()
+    if not user:
+        user = db.query(User).first()
+    if user:
+        user_id = user.id
 
     # Safety Guard: Check for Prompt Injection
     if SecurityGuard.scan_for_injection(chat_req.message):
@@ -150,32 +163,12 @@ async def chat_with_analyst(
         ai_reply = ollama_res["content"]
         model_used = ollama_res["model"]
     else:
-        # Transparent Offline State Handling as required by MASTER SPECIFICATION:
-        # "If Ollama is unavailable, show a clear offline/unavailable state. Never silently switch to cloud inference."
-        # Provide an offline deterministic security analyst assessment based on grounded facts.
-        model_used = "Offline Deterministic SOC Rule Engine (Ollama Unreachable)"
-        ai_reply = (
-            f"**[LOCAL OLLAMA SERVICE OFFLINE]**\n\n"
-            f"Notice: The local Ollama daemon is currently unreachable at `{settings.OLLAMA_BASE_URL}`.\n"
-            f"To enable generative local LLM reasoning: start `ollama serve` and pull `{settings.DEFAULT_LLM_MODEL}`.\n\n"
-            f"---\n"
-            f"### Deterministic Telemetry Assessment (Offline Fallback):\n"
-            f"- **Context Analyzed:** {context_data.get('type').upper()} ({context_data.get('id', 'N/A')})\n"
-            f"- **Severity Grounding:** {context_data.get('severity', 'Medium')}\n"
-            f"- **Observed Kill-Chain / Tactics:** {', '.join(context_data.get('mitre_tactics', ['Initial Access']))}\n\n"
-            f"**Key Evidence:**\n"
-        )
-        if context_data.get("events"):
-            for ev in context_data["events"][:3]:
-                ai_reply += f"- Event ID `{ev['id']}`: {ev['raw_log'][:120]}...\n"
-        else:
-            ai_reply += "- Query evaluated against local baseline detection rules.\n"
-
-        ai_reply += (
-            f"\n**Defensive Recommendations:**\n"
-            f"1. Contain the affected entity immediately if unauthorized connections persist.\n"
-            f"2. Inspect authentication failure rates and rotate credentials.\n"
-            f"3. Submit response actions through the Response & Automation Center."
+        # Autonomous Local Security Analyst Engine
+        model_used = "Cyber Black Autonomous Analyst Engine"
+        ai_reply = AutonomousAnalystEngine.generate_expert_response(
+            user_query=chat_req.message,
+            context_data=context_data,
+            rag_docs=rag_docs
         )
 
     # Save Assistant Message

@@ -30,15 +30,51 @@ The following 4 canonical accounts are pre-configured, tested, and active in the
 
 ---
 
-## 3. RED TEAM ADVERSARY SIMULATION CREDENTIALS
+## 3. DUAL AUTONOMOUS AGENTS ARCHITECTURE (BLACK & DARK)
 
-The Red Team simulation portal is an independent adversarial console disconnected from the standard SOC menu, designed for live interactive demonstrations:
+The Autonomous Agents Operations Center operates in two distinct, independently accessible routes:
 
-- **Adversary Simulation Portal URL:** `http://localhost:5173/attacks`
-- **Adversary Auth Gateway URL:** `http://localhost:5173/attacks/login`
-- **Operator Callsign:** `RED-OPERATOR-01`
-- **Simulation Clearance Key:** `ADVERSARY-SIM-2026`
-- **Available Attack Scenarios:** 12 enterprise attack scenarios (SSH Brute Force, Internal Port Scanning, Encrypted Data Exfiltration, Privilege Escalation, SQLi, Ransomware Pre-execution, Kerberoasting, DDoS SYN Flood, Stored XSS, PowerShell LotL, DNS Tunneling, and Insider Policy Tampering).
+### Navigation 1: Black Agent (`/agents/black`)
+- **Role:** Perimeter Gateway Fortress & Zero-Trust Port Armor.
+- **Scope:** Continuously monitors and protects all 9 core network ports (`:22, :80, :443, :8000, :5173, :3306, :5432, :8080, :53`).
+- **Master Shield Toggle:** Manual ON/OFF switch. When switched ON, unauthorized traffic is dropped via 100% gateway firewall drops (`[ACCESS BLOCKED]`). When switched OFF, attacks penetrate and exfiltrate target data.
+- **Standby Mode:** Automatically paused when Dark Agent is activated to lure adversaries into the deception honeypot.
+
+### Navigation 2: Dark Agent (`/agents/dark`)
+- **Role:** Autonomous Honeypot Deception, Target Exfiltration Containment, and Remote Device Browser Lock.
+- **Dark Access Code:** `Mani02` (Required to activate, configure, or manage Dark Agent).
+- **Ingress Honeypot:** When active, Black Agent stands down, allowing attackers to enter the honeypot container.
+- **5 Exfiltration Files:** Decoy environment stores 5 target files (`recon_targets.txt`, `customer_records.csv`, `api_endpoints.conf`, `system_architecture.json`, `audit_log_2026.txt`).
+- **Attacker Device Browser Lock:** Deploys automated reverse takeover that locks the attacker's browser viewport into full-screen **"YOUR SCREEN IS LOCKED BY DARK"** Red CRT display with retro television moving text animation and disabled inputs.
+- **Remote Release:** The device remains locked until released by the operator from the laptop dashboard or until Dark Agent is turned OFF.
+
+---
+
+## 4. MULTI-DEVICE DEMO CONFIGURATION (LAPTOP + MOBILE PHONE)
+
+| Device | Role | Access URL | Functions |
+|---|---|---|---|
+| **Main Device (Laptop)** | **SOC Command Center** | `http://localhost:5173/agents/dark` | Monitors Black Agent, controls Dark Agent with code `Mani02`, tracks attacker footprints, and clicks "RELEASE DEVICE" |
+| **Attacker Device (Mobile Phone)** | **Offensive Adversary Terminal** | `http://<laptop-ip>:5173/attacks` | Interactive CLI (`ls`, `cd`, `cat`, `att-0` to `att-12`), sudo password `AWT-0211`, gets locked with Red CRT screen |
+
+---
+
+## 5. ADVERSARY TERMINAL COMMANDS & CREDENTIALS
+
+The Adversary Simulation Terminal (`/attacks`) is a monochrome hacker terminal designed for live demonstrations:
+
+- **Terminal URL:** `http://localhost:5173/attacks` (or `http://<laptop-ip>:5173/attacks` on mobile)
+- **Terminal Sudo Password:** `AWT-0211` (for privileged commands; `ls`, `cd`, `cat` require no sudo)
+- **Target Repository Location:** `/var/data/targets/exfil` (5 files stored)
+- **Commands Available:**
+  - `ls [-la]` : List the 5 target files with sizes and permissions.
+  - `cat <filename>` : View the exact contents of any target file.
+  - `cd <dir>` : Change current working directory.
+  - `pwd` : Print current working location.
+  - `att-0` : Exfiltrate all 5 files when Black Agent is OFF / disarmed.
+  - `att-1` to `att-12` : Deploy simulated attack vectors 1 through 12.
+  - `sudo <cmd>` : Execute privileged commands using password `AWT-0211`.
+  - `clear` : Clear terminal screen.
 
 ---
 

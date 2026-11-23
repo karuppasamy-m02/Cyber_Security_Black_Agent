@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sliders,
+  Shield,
+  Skull,
 } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { useAuthStore } from '../../stores/authStore';
@@ -45,6 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       title: 'OVERVIEW',
       items: [
         { path: '/dashboard', label: 'Command Center', icon: LayoutDashboard },
+        { path: '/agents/black', label: 'Black Agent', icon: Shield, badge: 'SHIELD', badgeVariant: 'live' },
+        { path: '/agents/dark', label: 'Dark Agent', icon: Skull, badge: 'CONTROL', badgeVariant: 'accent' },
       ],
     },
     {

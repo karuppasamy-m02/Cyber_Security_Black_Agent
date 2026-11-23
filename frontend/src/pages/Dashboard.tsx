@@ -23,7 +23,6 @@ import { SeverityBadge } from '../components/ui/SeverityBadge';
 import { StatusPill } from '../components/ui/StatusPill';
 import { EventTrendChart } from '../components/charts/EventTrendChart';
 import { CategoryPieChart } from '../components/charts/CategoryPieChart';
-import { DualAgentDeck } from '../components/agents/DualAgentDeck';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -79,7 +78,7 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-[#A8A8A3] mt-1">
-            CYBER BLACK: Autonomous Black Agent (Gateway Defense) &amp; Red Agent (Deception &amp; Counter-Strike)
+            CYBER BLACK: Autonomous Threat Detection Matrix &amp; AMTIE 5-Layer Anomaly Engine
           </p>
         </div>
 
@@ -102,10 +101,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Autonomous Dual-Agent Deck (Black Agent Shield + Red Agent Honeypot) */}
-      <DualAgentDeck />
-
-      {/* 3. Primary KPI Metric Strip (6 Cards) */}
+      {/* Primary KPI Metric Strip (6 Cards) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {/* Total Events */}
         <div className="bg-[#111111] border border-[#2B2B2B] rounded-lg p-3.5 flex flex-col justify-between hover:border-[#3E3E3E] transition-colors shadow-subtle">

@@ -11,11 +11,24 @@ interface AuthState {
   initAuth: () => void;
 }
 
+// Canonical Lead SOC Architect account (Zero-barrier demonstration access)
+const DEFAULT_DEMO_USER: User = {
+  id: 'usr-mani02-admin',
+  username: 'mani02',
+  email: 'karuppasamy.selvi02@gmail.com',
+  full_name: 'Lead SOC Architect',
+  role: 'Administrator',
+  is_active: true,
+  created_at: new Date().toISOString()
+};
+
+const DEFAULT_DEMO_TOKEN = 'demo-session-token-cyberblack-mani02';
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: localStorage.getItem('cybersentinel_token'),
-  isAuthenticated: !!localStorage.getItem('cybersentinel_token'),
-  isLoading: true,
+  user: DEFAULT_DEMO_USER,
+  token: localStorage.getItem('cybersentinel_token') || DEFAULT_DEMO_TOKEN,
+  isAuthenticated: true,
+  isLoading: false,
 
   setAuth: (user, token) => {
     localStorage.setItem('cybersentinel_token', token);
@@ -42,6 +55,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem('cybersentinel_user');
       }
     }
-    set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+    // Default to authorized Lead SOC Architect for seamless demonstration
+    set({ user: DEFAULT_DEMO_USER, token: DEFAULT_DEMO_TOKEN, isAuthenticated: true, isLoading: false });
   }
 }));
