@@ -16,8 +16,11 @@ start "CYBER BLACK - Frontend" cmd /k "cd frontend && npm run dev -- --host 0.0.
 echo.
 echo ==========================================================
 echo  [SUCCESS] CYBER BLACK ACTIVE
-echo  Laptop SOC Center:     http://localhost:5173/agents
-echo  Mobile Attacker Phone: http://<your-laptop-ip>:5173/attacks
-echo  Dark Agent Code:       Mani02
+echo  Laptop SOC Command Center: http://localhost:5173/dashboard
+echo  Black Agent Defense:       http://localhost:5173/agents/black
+echo  Dark Agent Deception Core: http://localhost:5173/agents/dark
+echo  Mobile Attacker Terminal:  http://^<your-laptop-ip^>:5173/attacks
+echo  Attacker Sudo Password:    AWT-0211
+echo  Dark Agent Code:           Mani02
 echo ==========================================================
 echo.

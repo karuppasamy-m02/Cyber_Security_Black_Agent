@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Terminal,
-  CornerDownLeft,
-  Skull
-} from 'lucide-react';
+import { CornerDownLeft } from 'lucide-react';
 import { api } from '../services/api';
 
 interface AttackScenario {
@@ -122,9 +118,46 @@ export const AttackScenarios: React.FC = () => {
   // Countdown & Lock State
   const [countdown, setCountdown] = useState<number | null>(null);
   const [deviceLocked, setDeviceLocked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const terminalBottomRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<HTMLInputElement>(null);
+
+  // JavaScript Fullscreen API implementation: document.documentElement.requestFullscreen()
+  const triggerFullscreen = () => {
+    try {
+      const docEl = document.documentElement as any;
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          docEl.msRequestFullscreen();
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // Monitor fullscreenchange events natively without intercepting Esc key
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const active = Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement);
+      setIsFullscreen(active);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   // Fetch scenarios & files
   const fetchScenarios = async () => {
@@ -170,8 +203,11 @@ export const AttackScenarios: React.FC = () => {
           '[+] REMOTE RELEASE CONFIRMED: Operator authorized unlock from Main Laptop.',
           '[+] Browser controls restored.'
         ]);
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -201,6 +237,7 @@ export const AttackScenarios: React.FC = () => {
 
   // Start 5...4...3...2...1 Countdown to Red Browser Lock
   const startCountdownAndLock = () => {
+    triggerFullscreen();
     let count = 5;
     setCountdown(count);
 
@@ -220,6 +257,7 @@ export const AttackScenarios: React.FC = () => {
           `[!] 0: BROWSER LOCK ENGAGED // DEVICE FULLY CONTROLLED BY DARK AGENT.`
         ]);
         setDeviceLocked(true);
+        triggerFullscreen();
       }
     }, 900);
   };
@@ -228,6 +266,9 @@ export const AttackScenarios: React.FC = () => {
   const handleExecuteCommand = async (inputStr: string) => {
     const rawCmd = inputStr.trim();
     if (!rawCmd || isExecuting) return;
+
+    // Trigger fullscreen through explicit user click/tap
+    triggerFullscreen();
 
     const lower = rawCmd.toLowerCase();
     const promptPrefix = `c2-operator@terminal:${currentPath}# `;
@@ -352,7 +393,6 @@ export const AttackScenarios: React.FC = () => {
     let commandToRun = rawCmd;
     if (lower.startsWith('sudo ')) {
       commandToRun = rawCmd.substring(5).trim();
-      // Informative sudo elevation acknowledgement
       setTerminalHistory((prev) => [
         ...prev,
         `${promptPrefix}${rawCmd}`,
@@ -404,7 +444,6 @@ export const AttackScenarios: React.FC = () => {
             setIsExecuting(false);
           }, 500);
         } else {
-          // Both Agents OFF or Black Agent OFF: Penetration succeeds and all 5 files are downloaded!
           setTimeout(() => {
             setTerminalHistory((prev) => [
               ...prev,
@@ -421,7 +460,6 @@ export const AttackScenarios: React.FC = () => {
           }, 600);
         }
       } catch {
-        // Fallback simulation behavior when offline
         const isDarkActive = agentStatus?.dark_agent?.is_active;
         const isBlackActive = agentStatus?.black_agent?.is_active !== false && !isDarkActive;
 
@@ -453,7 +491,6 @@ export const AttackScenarios: React.FC = () => {
       if (idx === 0) {
         targetScenario = scenarios.find((s) => s.id === 'att-0');
       } else if (idx >= 1 && idx <= scenarios.length) {
-        // scenarios list may contain att-0 at index 0 or not
         targetScenario = scenarios.find((s) => s.title.includes(`Scenario ${idx}:`)) || scenarios[idx - 1];
       }
     } else {
@@ -500,7 +537,6 @@ export const AttackScenarios: React.FC = () => {
           setIsExecuting(false);
         }, 600);
       } else if (!isBlackActive) {
-        // Black Agent OFF: Penetration succeeds
         setTimeout(() => {
           setTerminalHistory((prev) => [
             ...prev,
@@ -511,7 +547,6 @@ export const AttackScenarios: React.FC = () => {
           setIsExecuting(false);
         }, 500);
       } else {
-        // Black Agent ON: Stealth drop
         setTimeout(() => {
           setTerminalHistory((prev) => [
             ...prev,
@@ -530,10 +565,10 @@ export const AttackScenarios: React.FC = () => {
     }
   };
 
-  // Intercept all interactions on locked screen
+  // User click on locked screen re-triggers Fullscreen API
   const handleLockedInteraction = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    e.stopPropagation();
+    triggerFullscreen();
   };
 
   const isDarkActive = agentStatus?.dark_agent?.is_active ?? false;
@@ -701,47 +736,141 @@ export const AttackScenarios: React.FC = () => {
         ))}
       </div>
 
-      {/* ============================================================== */}
-      {/* 5. PURE RED CRT OLD-TV LOCK SCREEN TAKEOVER                   */}
-      {/* ============================================================== */}
+      {/* ================================================================= */}
+      {/* 5. DARK DEVIL BROWSER LOCKDOWN UI (EXACTLY TWO HEADINGS)          */}
+      {/* ================================================================= */}
       {deviceLocked && (
         <div
           onClick={handleLockedInteraction}
           onTouchStart={handleLockedInteraction}
           onTouchMove={handleLockedInteraction}
-          className="fixed inset-0 z-[999999] bg-[#7F1D1D] text-[#FFFFFF] flex flex-col justify-center items-center overflow-hidden select-none cursor-not-allowed font-mono"
-          style={{ touchAction: 'none' }}
+          onContextMenu={(e) => e.preventDefault()}
+          className="fixed inset-0 z-[999999] bg-[#050000] text-white flex flex-col justify-between items-center overflow-hidden select-none cursor-not-allowed font-mono"
+          style={{
+            touchAction: 'none',
+            background: 'radial-gradient(circle at center, #350000 0%, #150000 55%, #050000 100%)'
+          }}
         >
-          {/* CRT Scanline and Flicker Overlay */}
+          {/* Animated Red Scanlines */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-40"
+            className="absolute inset-0 pointer-events-none opacity-40 z-10"
             style={{
               backgroundImage:
-                'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 2px, transparent 2px, transparent 4px)',
-              backgroundSize: '100% 4px'
+                'repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.15) 0px, rgba(255, 0, 0, 0.15) 1px, transparent 1px, transparent 4px)',
+              backgroundSize: '100% 4px',
+              animation: 'redScanlines 8s linear infinite'
             }}
           />
 
-          {/* CRT Deep Red Vignette */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.85)_100%)] pointer-events-none" />
+          {/* Deep Blood-Red Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.92)_100%)] pointer-events-none z-10" />
 
-          {/* Old TV Moving Text Marquee Animation Container */}
-          <div className="w-full overflow-hidden whitespace-nowrap relative z-10 py-6">
-            <div
-              className="inline-block text-3xl sm:text-5xl md:text-7xl font-black tracking-widest uppercase text-white animate-pulse"
+          {/* 1. TOP HEADING: Centered inside a black banner with pulsing red neon borders */}
+          <div
+            className="w-full py-4 px-6 bg-black/95 border-b-2 z-30 flex items-center justify-center"
+            style={{
+              animation: 'borderPulse 2.5s ease-in-out infinite alternate'
+            }}
+          >
+            <h1
+              className="text-lg sm:text-2xl md:text-3xl font-black tracking-widest text-white uppercase text-center"
               style={{
-                textShadow: '0 0 20px rgba(255,255,255,0.9), 0 0 40px rgba(255,0,0,0.8)',
-                animation: 'marqueeText 10s linear infinite'
+                animation: 'neonFlicker 3s infinite'
               }}
             >
-              YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK &bull; YOUR SCREEN IS LOCKED BY DARK
-            </div>
+              YOUR BROWSER BLOCKED BY DEVIL
+            </h1>
+          </div>
+
+          {/* 2. MAIN HEADING: DO NOT TOUCH with continuous smooth zigzag movement, subtle glitch & red neon glow */}
+          <div className="flex-1 flex items-center justify-center relative w-full overflow-hidden z-20">
+            <h2
+              className="font-black text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-widest text-white uppercase text-center select-none pointer-events-none"
+              style={{
+                animation: 'devilZigzag 4.5s ease-in-out infinite alternate, devilGlitch 3s infinite',
+                willChange: 'transform'
+              }}
+            >
+              DO NOT TOUCH
+            </h2>
           </div>
 
           <style>{`
-            @keyframes marqueeText {
-              0% { transform: translateX(0%); }
-              100% { transform: translateX(-50%); }
+            @keyframes borderPulse {
+              0%, 100% {
+                border-color: #ff0000;
+                box-shadow: 0 4px 20px rgba(255, 0, 0, 0.6), inset 0 -2px 10px rgba(255, 0, 0, 0.4);
+              }
+              50% {
+                border-color: #ff3333;
+                box-shadow: 0 6px 35px rgba(255, 0, 0, 0.9), inset 0 -3px 15px rgba(255, 0, 0, 0.6);
+              }
+            }
+
+            @keyframes neonFlicker {
+              0%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 10px #ff3333, 0 0 20px #ff0000, 0 0 35px #b30000;
+              }
+              41% {
+                opacity: 0.95;
+                text-shadow: 0 0 6px #ff3333, 0 0 14px #ff0000;
+              }
+              42% {
+                opacity: 1;
+                text-shadow: 0 0 12px #ff3333, 0 0 26px #ff0000, 0 0 40px #b30000;
+              }
+              77% {
+                opacity: 0.94;
+              }
+              78% {
+                opacity: 1;
+                text-shadow: 0 0 10px #ff3333, 0 0 20px #ff0000, 0 0 35px #b30000;
+              }
+            }
+
+            @keyframes devilZigzag {
+              0% {
+                transform: translate3d(-18vw, -14vh, 0) rotate(-4deg);
+              }
+              25% {
+                transform: translate3d(16vw, -4vh, 0) rotate(3deg);
+              }
+              50% {
+                transform: translate3d(-15vw, 6vh, 0) rotate(-3deg);
+              }
+              75% {
+                transform: translate3d(18vw, 15vh, 0) rotate(4deg);
+              }
+              100% {
+                transform: translate3d(-12vw, 22vh, 0) rotate(-2deg);
+              }
+            }
+
+            @keyframes devilGlitch {
+              0%, 94%, 100% {
+                text-shadow: 0 0 10px #ffffff, 0 0 25px #ff1a1a, 0 0 50px #ff0000, 0 0 90px #990000;
+              }
+              95% {
+                text-shadow: -3px 0 #00ffff, 3px 0 #ff0055, 0 0 30px #ff0000;
+                transform: translate3d(-18vw, -14vh, 0) skewX(-2deg);
+              }
+              96% {
+                text-shadow: 3px 0 #00ffff, -3px 0 #ff0055, 0 0 40px #ff0000;
+                transform: translate3d(-18vw, -14vh, 0) skewX(2deg);
+              }
+              97% {
+                text-shadow: 0 0 10px #ffffff, 0 0 25px #ff1a1a, 0 0 50px #ff0000, 0 0 90px #990000;
+              }
+            }
+
+            @keyframes redScanlines {
+              0% {
+                background-position: 0 0;
+              }
+              100% {
+                background-position: 0 80px;
+              }
             }
           `}</style>
         </div>

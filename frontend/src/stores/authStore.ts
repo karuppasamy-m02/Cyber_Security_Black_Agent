@@ -22,7 +22,8 @@ const DEFAULT_DEMO_USER: User = {
   created_at: new Date().toISOString()
 };
 
-const DEFAULT_DEMO_TOKEN = 'demo-session-token-cyberblack-mani02';
+const DEFAULT_DEMO_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtYW5pMDIiLCJyb2xlIjoiQWRtaW5pc3RyYXRvciIsInVzZXJfaWQiOiJ1c3ItbWFuaTAyLWFkbWluIiwiZXhwIjoxNzk1NTQxMDg4fQ.TewKl2IYwIkT0xyGmuMXSOsnJJmvI6SzrxOLJEW4dg8';
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: DEFAULT_DEMO_USER,
