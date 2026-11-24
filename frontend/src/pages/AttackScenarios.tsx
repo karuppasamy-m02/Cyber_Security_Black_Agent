@@ -279,29 +279,9 @@ export const AttackScenarios: React.FC = () => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Secret emergency override (7 rapid taps anywhere within 2.5 seconds unlocks)
-    let secretTapCount = 0;
-    let lastTapTime = 0;
-    const registerSecretTap = () => {
-      const now = Date.now();
-      if (now - lastTapTime < 500) {
-        secretTapCount += 1;
-        if (secretTapCount >= 7) {
-          setDeviceLocked(false);
-          api.post('/agents/dark/release-lock').catch(() => {});
-          if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
-        }
-      } else {
-        secretTapCount = 1;
-      }
-      lastTapTime = now;
-    };
-
-    // Complete block function for all user touch, pointer, and click interactions
+    // Complete block function for all user touch, pointer, and click interactions (DO NOT TOUCH - FULL BLOCK)
+    // CANNOT BE UNLOCKED LOCALLY ON MOBILE! ONLY UNLOCKED REMOTELY FROM MAIN LAPTOP SITE!
     const blockInteraction = (e: Event) => {
-      registerSecretTap();
       e.preventDefault();
       e.stopPropagation();
     };
@@ -398,7 +378,7 @@ export const AttackScenarios: React.FC = () => {
     }
   };
 
-  // Poll lock status from backend (released remotely by operator)
+  // Poll lock status from backend (released ONLY when operator unlocks or stops agent on Main Site)
   const checkBackendLock = async () => {
     try {
       const res = await api.get<any>('/agents/dark/lock-status');
@@ -408,8 +388,8 @@ export const AttackScenarios: React.FC = () => {
         setDeviceLocked(false);
         setTerminalHistory((prev) => [
           ...prev,
-          '[+] REMOTE RELEASE CONFIRMED: Operator authorized unlock from Main Laptop.',
-          '[+] Browser controls restored.'
+          '[+] REMOTE RELEASE CONFIRMED: Operator authorized unlock or stopped Dark Agent from Main Laptop.',
+          '[+] Attacker device browser controls restored.'
         ]);
         if (document.fullscreenElement && document.exitFullscreen) {
           document.exitFullscreen().catch(() => {});
@@ -419,6 +399,36 @@ export const AttackScenarios: React.FC = () => {
       // ignore
     }
   };
+
+  // WebSocket for instant 0ms unlock when released or Dark Agent is stopped on Main Site
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/telemetry`;
+    let socket: WebSocket | null = null;
+    try {
+      socket = new WebSocket(wsUrl);
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'DARK_DEVICE_RELEASED' || (data.type === 'DARK_AGENT_TOGGLED' && !data.is_active)) {
+            setDeviceLocked(false);
+            setTerminalHistory((prev) => [
+              ...prev,
+              '[+] REMOTE RELEASE CONFIRMED: Operator authorized unlock or stopped Dark Agent from Main Laptop.',
+              '[+] Attacker device browser controls restored.'
+            ]);
+            if (document.fullscreenElement && document.exitFullscreen) {
+              document.exitFullscreen().catch(() => {});
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      if (socket) socket.close();
+    };
+  }, []);
 
   useEffect(() => {
     const host = window.location.hostname;
@@ -432,7 +442,7 @@ export const AttackScenarios: React.FC = () => {
     const interval = setInterval(() => {
       checkAgentStatus();
       checkBackendLock();
-    }, 1500);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [deviceLocked, countdown]);
@@ -802,14 +812,22 @@ export const AttackScenarios: React.FC = () => {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={handleInstallClick}
-            className="px-2.5 py-1.5 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-[#FFFFFF] text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-purple-950/40 active:scale-95 transition-all"
-            title="Download & Install as Mobile App"
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all ${
+              isPwaInstalled
+                ? 'bg-[#140624] border-[#4C1D95] text-[#C4B5FD]'
+                : deferredPrompt
+                ? 'bg-gradient-to-r from-[#7E22CE] to-[#9333EA] border-[#C084FC] text-white shadow-purple-950/60 animate-pulse'
+                : 'bg-[#2E1065] hover:bg-[#3B0764] border-[#9333EA] text-[#FFFFFF]'
+            }`}
+            title="Install as Mobile PWA App"
           >
             <Download className="w-3.5 h-3.5 text-[#C084FC]" />
             <span className="hidden sm:inline">
-              {isPwaInstalled ? 'APP INSTALLED' : 'DOWNLOAD APP'}
+              {isPwaInstalled ? 'PWA INSTALLED' : deferredPrompt ? 'INSTALL PWA APP' : 'INSTALL APP'}
             </span>
-            <span className="sm:hidden">APP</span>
+            <span className="sm:hidden">
+              {isPwaInstalled ? 'INSTALLED' : deferredPrompt ? 'INSTALL' : 'APP'}
+            </span>
           </button>
         </div>
       </header>

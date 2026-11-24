@@ -314,12 +314,17 @@ class DarkAgentService:
                 "status": "UNLOCKED"
             }
 
-        # Check matched device
+        # Check matched device or any actively locked device
         matched = None
         for k, v in self.locked_devices.items():
             if (k == client_ip or v.get("client_ip") == client_ip) and v.get("is_locked", False):
                 matched = v
                 break
+
+        if not matched:
+            active_locked = [v for v in self.locked_devices.values() if v.get("is_locked", False)]
+            if active_locked:
+                matched = active_locked[-1]
 
         if matched:
             return {

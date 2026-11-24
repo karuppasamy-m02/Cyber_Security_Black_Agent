@@ -1,9 +1,11 @@
 // Purple Hat Terminal Service Worker for PWA Installation and Offline Shell
-const CACHE_NAME = 'purplehat-v1';
+const CACHE_NAME = 'purplehat-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/attacks',
   '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
   '/logo.png',
   '/block-screen.jpg',
   '/block-screen.png'
@@ -33,8 +35,28 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network first, fallback to cache
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Cache successful responses for assets
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache).catch(() => {});
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          if (event.request.headers.get('accept')?.includes('text/html')) {
+            return caches.match('/attacks');
+          }
+        });
+      })
   );
 });

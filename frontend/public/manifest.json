@@ -2,24 +2,45 @@
   "name": "Purple Hat Terminal",
   "short_name": "PurpleHat",
   "description": "Purple Hat Adversary C2 Terminal & Security Suite",
+  "id": "/attacks",
   "start_url": "/attacks",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "fullscreen"],
   "orientation": "portrait",
   "background_color": "#000000",
-  "theme_color": "#7E22CE",
+  "theme_color": "#000000",
+  "categories": ["utilities", "security"],
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/logo.png",
-      "sizes": "512x512",
+      "sizes": "1254x1254",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
