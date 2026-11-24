@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CornerDownLeft } from 'lucide-react';
+import {
+  CornerDownLeft,
+  Skull,
+  Download,
+  Smartphone,
+  Shield,
+  Layers,
+  Terminal,
+  X,
+  Share2,
+  Check
+} from 'lucide-react';
 import { api } from '../services/api';
 
 interface AttackScenario {
@@ -103,11 +114,11 @@ export const AttackScenarios: React.FC = () => {
 
   // Terminal History
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
-    '[*] OFFENSIVE C2 ADVERSARY TERMINAL INITIALIZED',
-    '[*] Socket connection established with target gateway 10.0.0.1',
-    '[*] Exfil location: /var/data/targets/exfil (Total 5 Target Files Available)',
-    '[*] Commands: "ls", "cd <dir>", "cat <file>", "att-0" to "att-12", "clear"',
-    '[*] Sudo elevation password: AWT-0211 (ls, cd, cat do not require sudo)'
+    '[*] PURPLE HAT TERMINAL // C2 ADVERSARY CONSOLE INITIALIZED',
+    '[*] Target gateway: 10.0.0.1 (Ports 22, 80, 443, 8000, 3306 monitored)',
+    '[*] Exfil node: /var/data/targets/exfil (5 Target Files Armed)',
+    '[*] Quick Commands: "ls", "cat <file>", "att-0" to "att-12", "clear"',
+    '[*] Type "help" for full command guide or tap 1-TAP quick actions below.'
   ]);
   const [commandInput, setCommandInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
@@ -118,18 +129,22 @@ export const AttackScenarios: React.FC = () => {
   // Countdown & Lock State
   const [countdown, setCountdown] = useState<number | null>(null);
   const [deviceLocked, setDeviceLocked] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // PWA & Mobile Download State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   const terminalBottomRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<HTMLInputElement>(null);
 
-  // JavaScript Fullscreen API implementation: document.documentElement.requestFullscreen()
+  // Fullscreen trigger helper
   const triggerFullscreen = () => {
     try {
       const docEl = document.documentElement as any;
       if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
         if (docEl.requestFullscreen) {
-          docEl.requestFullscreen().catch(() => { });
+          docEl.requestFullscreen().catch(() => {});
         } else if (docEl.webkitRequestFullscreen) {
           docEl.webkitRequestFullscreen();
         } else if (docEl.mozRequestFullScreen) {
@@ -143,23 +158,104 @@ export const AttackScenarios: React.FC = () => {
     }
   };
 
-  // Monitor fullscreenchange events natively without intercepting Esc key
+  // 1. PWA beforeinstallprompt Listener
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const active = Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement);
-      setIsFullscreen(active);
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone
+    ) {
+      setIsPwaInstalled(true);
+    }
 
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
 
-  // Fetch scenarios & files
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsPwaInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setShowInstallModal(true);
+    }
+  };
+
+  // 2. ABSOLUTE GESTURE & SWIPE LOCKDOWN (Forward, Backward, Top, Bottom, Edge-Swipes)
+  useEffect(() => {
+    if (!deviceLocked) return;
+
+    // Trap history so swipe back/forward or back button stays on lock page
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    // Completely cancel all touchmove events (stops pull-to-refresh & scroll)
+    const preventTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // Cancel all touchstart with multi-touch (stops pinch/zoom gestures)
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    // Prevent wheel scrolling
+    const preventWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // Prevent navigation keys
+    const preventKeys = (e: KeyboardEvent) => {
+      if (
+        ['F5', 'Escape', 'Backspace'].includes(e.key) ||
+        (e.ctrlKey && ['r', 'R'].includes(e.key)) ||
+        (e.altKey && ['ArrowLeft', 'ArrowRight'].includes(e.key))
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    // Prevent context menu
+    const preventContext = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('touchmove', preventTouch, { passive: false });
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('wheel', preventWheel, { passive: false });
+    window.addEventListener('keydown', preventKeys);
+    window.addEventListener('contextmenu', preventContext);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('touchmove', preventTouch);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('wheel', preventWheel);
+      window.removeEventListener('keydown', preventKeys);
+      window.removeEventListener('contextmenu', preventContext);
+    };
+  }, [deviceLocked]);
+
+  // 3. Fetch scenarios & target files
   const fetchScenarios = async () => {
     try {
       const data = await api.get<AttackScenario[]>('/attacks/scenarios');
@@ -176,7 +272,7 @@ export const AttackScenarios: React.FC = () => {
         setCapturedFiles(data);
       }
     } catch {
-      // fallback to default
+      // fallback
     }
   };
 
@@ -184,7 +280,7 @@ export const AttackScenarios: React.FC = () => {
     try {
       const res = await api.get<any>('/agents/status');
       setAgentStatus(res);
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -196,7 +292,6 @@ export const AttackScenarios: React.FC = () => {
       if (res.is_locked && !deviceLocked && countdown === null) {
         startCountdownAndLock();
       } else if (!res.is_locked && deviceLocked) {
-        // Released remotely by operator on laptop
         setDeviceLocked(false);
         setTerminalHistory((prev) => [
           ...prev,
@@ -204,7 +299,7 @@ export const AttackScenarios: React.FC = () => {
           '[+] Browser controls restored.'
         ]);
         if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => { });
+          document.exitFullscreen().catch(() => {});
         }
       }
     } catch {
@@ -214,7 +309,7 @@ export const AttackScenarios: React.FC = () => {
 
   useEffect(() => {
     const host = window.location.hostname;
-    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '192.168.1.8 (Local Mobile)' : host);
+    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '192.168.1.8 (Mobile)' : host);
 
     fetchScenarios();
     fetchFiles();
@@ -254,7 +349,7 @@ export const AttackScenarios: React.FC = () => {
         setCountdown(null);
         setTerminalHistory((prev) => [
           ...prev,
-          `[!] 0: BROWSER LOCK ENGAGED // DEVICE FULLY CONTROLLED BY DARK AGENT.`
+          `[!] 0: BROWSER LOCK ENGAGED // DEVICE FULLY CONTROLLED BY DEVIL DEFENSE.`
         ]);
         setDeviceLocked(true);
         triggerFullscreen();
@@ -262,44 +357,55 @@ export const AttackScenarios: React.FC = () => {
     }, 900);
   };
 
-  // Command execution router
+  // 4. Command Router & Execution Logic
   const handleExecuteCommand = async (inputStr: string) => {
     const rawCmd = inputStr.trim();
     if (!rawCmd || isExecuting) return;
 
-    // Trigger fullscreen through explicit user click/tap
     triggerFullscreen();
 
     const lower = rawCmd.toLowerCase();
-    const promptPrefix = `c2-operator@terminal:${currentPath}# `;
+    const promptPrefix = `purple-hat@terminal:${currentPath}# `;
 
-    // 1. CLEAR
+    // CLEAR
     if (lower === 'clear' || lower === 'cls') {
-      setTerminalHistory(['[*] Terminal screen cleared. Ready for commands.']);
+      setTerminalHistory(['[*] Terminal screen cleared. Ready for Purple Hat commands.']);
       setCommandInput('');
       return;
     }
 
-    // 2. HELP
+    // HELP
     if (lower === 'help') {
       setTerminalHistory((prev) => [
         ...prev,
         `${promptPrefix}${rawCmd}`,
-        '=== COMMANDS REFERENCE ===',
-        '  ls [-l|-la]          : List all 5 exfiltrated / target repository files',
-        '  cat <filename>       : Print the contents of a target file',
-        '  cd <path>            : Change current working directory',
-        '  pwd                  : Print current working directory',
-        '  att-0                : Exfiltrate all 5 files when perimeter shield is OFF',
-        '  att-1 to att-12      : Deploy individual simulated attack vectors',
-        '  sudo <cmd>           : Elevate privileges (Password: AWT-0211)',
-        '  clear                : Clear terminal viewport'
+        '=== PURPLE HAT TERMINAL COMMANDS ===',
+        '  ls [-l]          : List target repository exfiltration files',
+        '  cat <file>       : Inspect target file contents',
+        '  cd <dir>         : Change current directory',
+        '  pwd              : Print working directory',
+        '  att-0            : Exfiltrate all 5 target files',
+        '  att-1 to att-12  : Deploy attack vector scenarios',
+        '  lock             : Manually trigger browser lock demonstration',
+        '  clear            : Clear viewport'
       ]);
       setCommandInput('');
       return;
     }
 
-    // 3. PWD
+    // LOCK DEMO
+    if (lower === 'lock' || lower === 'block') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `${promptPrefix}${rawCmd}`,
+        '[*] Manual lock initiated: Triggering Devil Browser Lock...'
+      ]);
+      startCountdownAndLock();
+      setCommandInput('');
+      return;
+    }
+
+    // PWD
     if (lower === 'pwd') {
       setTerminalHistory((prev) => [
         ...prev,
@@ -310,7 +416,7 @@ export const AttackScenarios: React.FC = () => {
       return;
     }
 
-    // 4. CD
+    // CD
     if (lower.startsWith('cd')) {
       const parts = rawCmd.split(/\s+/);
       const targetDir = parts[1] || '~';
@@ -336,23 +442,23 @@ export const AttackScenarios: React.FC = () => {
       return;
     }
 
-    // 5. LS
+    // LS
     if (lower === 'ls' || lower.startsWith('ls ') || lower === 'dir') {
       const lines = [
         `${promptPrefix}${rawCmd}`,
         `total 5 files in ${currentPath}:`,
-        `-rw-r--r-- 1 c2-operator c2-operator  482 Nov 23 22:20 recon_targets.txt`,
-        `-rw-r--r-- 1 c2-operator c2-operator  512 Nov 23 22:20 customer_records.csv`,
-        `-rw-r--r-- 1 c2-operator c2-operator  345 Nov 23 22:20 api_endpoints.conf`,
-        `-rw-r--r-- 1 c2-operator c2-operator  418 Nov 23 22:20 system_architecture.json`,
-        `-rw-r--r-- 1 c2-operator c2-operator  520 Nov 23 22:20 audit_log_2026.txt`
+        `-rw-r--r-- 1 purple-hat c2-agent  482 Nov 24 07:45 recon_targets.txt`,
+        `-rw-r--r-- 1 purple-hat c2-agent  512 Nov 24 07:45 customer_records.csv`,
+        `-rw-r--r-- 1 purple-hat c2-agent  345 Nov 24 07:45 api_endpoints.conf`,
+        `-rw-r--r-- 1 purple-hat c2-agent  418 Nov 24 07:45 system_architecture.json`,
+        `-rw-r--r-- 1 purple-hat c2-agent  520 Nov 24 07:45 audit_log_2026.txt`
       ];
       setTerminalHistory((prev) => [...prev, ...lines]);
       setCommandInput('');
       return;
     }
 
-    // 6. CAT
+    // CAT
     if (lower.startsWith('cat ') || lower === 'cat') {
       const parts = rawCmd.split(/\s+/);
       const filename = parts[1];
@@ -389,23 +495,23 @@ export const AttackScenarios: React.FC = () => {
       return;
     }
 
-    // 7. SUDO CHECK
+    // SUDO CHECK
     let commandToRun = rawCmd;
     if (lower.startsWith('sudo ')) {
       commandToRun = rawCmd.substring(5).trim();
       setTerminalHistory((prev) => [
         ...prev,
         `${promptPrefix}${rawCmd}`,
-        `[sudo] authorized for c2-operator with clearance AWT-0211`
+        `[sudo] clearance verified for purple-hat operator.`
       ]);
     } else {
       setTerminalHistory((prev) => [...prev, `${promptPrefix}${rawCmd}`]);
     }
 
-    // 8. ATTACK COMMANDS: ATT-0 OR ATT-1 .. ATT-12
+    // ATTACK COMMANDS: ATT-0 OR ATT-1 .. ATT-12
     const cleanLower = commandToRun.toLowerCase();
 
-    // Check for ATT-0 (All Files Exfiltration)
+    // Check for ATT-0 (Exfiltrate All 5 Files)
     if (cleanLower === 'att-0' || cleanLower === 'att0' || cleanLower === '0') {
       setIsExecuting(true);
       setCommandInput('');
@@ -413,9 +519,9 @@ export const AttackScenarios: React.FC = () => {
 
       setTerminalHistory((prev) => [
         ...prev,
-        `[*] [${nowTime}] Deploying Vector: ATT-0 (Comprehensive Target Files Exfiltration)`,
-        `[*] Target Asset: 10.0.0.15:443 [TCP] -> /var/data/targets/exfil`,
-        `[*] Testing gateway defense status...`
+        `[*] [${nowTime}] Deploying Vector: ATT-0 (Comprehensive Exfiltration)`,
+        `[*] Target Asset: 10.0.0.15:443 [TCP] -> ${currentPath}`,
+        `[*] Testing target gateway shield status...`
       ]);
 
       try {
@@ -447,7 +553,7 @@ export const AttackScenarios: React.FC = () => {
           setTimeout(() => {
             setTerminalHistory((prev) => [
               ...prev,
-              `[+] EXPLOIT SUCCESSFUL: Perimeter defense unshielded (Black Agent Disarmed).`,
+              `[+] EXPLOIT SUCCESSFUL: Target gateway perimeter shield is offline.`,
               `[+] Ingress established on port 443. Downloading target assets (5 total files):`,
               `    -> [1/5] recon_targets.txt (482 B) [SAVED]`,
               `    -> [2/5] customer_records.csv (512 B) [SAVED]`,
@@ -474,8 +580,7 @@ export const AttackScenarios: React.FC = () => {
         } else {
           setTerminalHistory((prev) => [
             ...prev,
-            `[+] EXPLOIT SUCCESSFUL: Perimeter defense disarmed.`,
-            `[+] Downloaded 5 target files to ${currentPath}. Type "ls" or "cat <file>" to read.`
+            `[+] EXPLOIT SUCCESSFUL: Downloaded 5 target files to ${currentPath}. Type "ls" to view.`
           ]);
         }
         setIsExecuting(false);
@@ -559,79 +664,92 @@ export const AttackScenarios: React.FC = () => {
     } catch {
       setTerminalHistory((prev) => [
         ...prev,
-        `[!] ACCESS BLOCKED: Connection refused by target gateway.`
+        `[!] ACCESS BLOCKED: Connection refused by target gateway firewall (TCP RST/DROP).`
       ]);
       setIsExecuting(false);
     }
   };
 
-  // User click on locked screen re-triggers Fullscreen API
-  const handleLockedInteraction = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    triggerFullscreen();
-  };
-
   const isDarkActive = agentStatus?.dark_agent?.is_active ?? false;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#E0E0E0] font-mono selection:bg-[#333333] selection:text-[#FFFFFF] flex flex-col justify-between p-3 sm:p-5 select-none relative">
-      {/* 1. Terminal Header */}
-      <header className="border-b border-[#222222] pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-3 h-3 rounded-full bg-[#E0E0E0] animate-pulse" />
-          <h1 className="text-sm font-bold tracking-widest uppercase text-[#FFFFFF]">
-            OFFENSIVE ADVERSARY TERMINAL [C2-CLIENT]
-          </h1>
-          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#111111] border border-[#333333] text-[#888888]">
-            {mobileIp}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-[#888888]">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={`w-2 h-2 rounded-full ${isDarkActive ? 'bg-[#FFFFFF] animate-ping' : 'bg-[#555555]'
-                }`}
-            />
-            Target Ingress: <strong className="text-[#FFFFFF]">{isDarkActive ? 'DECOY OPEN' : 'ARMORED'}</strong>
-          </span>
-        </div>
-      </header>
-
-      {/* 2. Top Cheatsheet Notes (All Attacks List & Commands) */}
-      <div className="p-3 rounded-lg bg-[#080808] border border-[#222222] text-xs space-y-2 mb-3">
-        <div className="text-[11px] font-bold text-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-[#1A1A1A] pb-1.5">
-          <span>ATTACK CHEATSHEET &amp; SHELL UTILITIES</span>
-          <div className="flex items-center gap-2 text-[10px] text-[#888888]">
-            <span className="text-[#CCCCCC] font-bold">SUDO PASS: AWT-0211</span>
-            <span>&bull;</span>
-            <span>FILES: 5 STORED</span>
+    <div className="min-h-screen bg-[#000000] text-[#E0E0E0] font-mono selection:bg-[#3B0764] selection:text-[#F3E8FF] flex flex-col justify-between p-2.5 sm:p-4 select-none relative max-w-5xl mx-auto">
+      {/* ================================================================= */}
+      {/* 1. TOP PURPLE HAT TERMINAL HEADING ONLY                           */}
+      {/* ================================================================= */}
+      <header className="border-b border-[#2A183E] pb-3 mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#2E1065] border border-[#7E22CE] flex items-center justify-center shadow-lg shadow-purple-950/60 shrink-0">
+            <Skull className="w-4 h-4 text-[#C084FC] animate-pulse" />
+          </div>
+          <div>
+            <h1 className="text-sm sm:text-base font-black tracking-widest uppercase text-[#F3E8FF] drop-shadow-[0_0_12px_rgba(168,85,247,0.5)]">
+              PURPLE HAT TERMINAL
+            </h1>
+            <div className="text-[10px] text-[#A855F7] flex items-center gap-2 font-mono">
+              <span className="text-[#C084FC]">C2-OPERATOR</span>
+              <span>•</span>
+              <span className="text-[#E9D5FF]">{mobileIp}</span>
+              <span>•</span>
+              <span className={isDarkActive ? 'text-emerald-400 font-bold' : 'text-[#A855F7]'}>
+                {isDarkActive ? '● DECOY OPEN' : '● ARMORED'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Quick Shell Utilities Pill Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px] text-[#A0A0A0]">
-          <span className="text-[10px] font-bold text-[#666666] shrink-0">COMMANDS:</span>
-          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear'].map((cmd) => (
+        {/* Mobile Download / Install App Button */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={handleInstallClick}
+            className="px-2.5 py-1.5 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-[#F3E8FF] text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-purple-950/40 active:scale-95 transition-all"
+            title="Download & Install as Mobile App"
+          >
+            <Download className="w-3.5 h-3.5 text-[#C084FC]" />
+            <span className="hidden sm:inline">
+              {isPwaInstalled ? 'APP INSTALLED' : 'DOWNLOAD APP'}
+            </span>
+            <span className="sm:hidden">APP</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ================================================================= */}
+      {/* 2. ATTACK CHEATSHEET & 1-TAP QUICK COMMAND PILLS                  */}
+      {/* ================================================================= */}
+      <div className="p-2.5 rounded-lg bg-[#08030F] border border-[#2A183E] text-xs space-y-2 mb-2">
+        <div className="text-[10px] sm:text-[11px] font-bold text-[#F3E8FF] flex items-center justify-between border-b border-[#1E0F30] pb-1">
+          <span className="text-[#C084FC]">OFFENSIVE VECTORS MATRIX &amp; SHELL UTILITIES</span>
+          <span className="text-[#A855F7] text-[10px]">TAP TO DEPLOY</span>
+        </div>
+
+        {/* 1-Tap Quick Action Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
+          <span className="text-[10px] font-bold text-[#7E22CE] shrink-0">QUICK:</span>
+          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear', 'lock'].map((cmd) => (
             <button
               key={cmd}
               onClick={() => handleExecuteCommand(cmd)}
               disabled={isExecuting || deviceLocked}
-              className="px-2 py-0.5 rounded bg-[#111111] hover:bg-[#222222] border border-[#262626] text-[#FFFFFF] font-mono text-[10px] shrink-0 transition-colors"
+              className={`px-2 py-0.5 rounded font-mono text-[10px] shrink-0 transition-colors border ${
+                cmd === 'lock'
+                  ? 'bg-red-950/80 hover:bg-red-900 border-red-700 text-red-200'
+                  : 'bg-[#180A28] hover:bg-[#2E1065] border-[#3B195C] text-[#E9D5FF]'
+              }`}
             >
-              {cmd}
+              {cmd.toUpperCase()}
             </button>
           ))}
         </div>
 
-        {/* Attack Vector Numbers */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-1 text-[11px] text-[#A0A0A0] pt-1 border-t border-[#161616]">
+        {/* Attack Vector Buttons Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1 text-[10px] sm:text-[11px] text-[#A855F7] pt-1 border-t border-[#1E0F30]">
           <button
             onClick={() => handleExecuteCommand('att-0')}
             disabled={isExecuting || deviceLocked}
-            className="text-left hover:text-[#FFFFFF] hover:bg-[#111111] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+            className="text-left hover:text-[#F3E8FF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
           >
-            <span className="font-bold text-[#FFFFFF] group-hover:underline">[ATT-0]</span>
+            <span className="font-bold text-[#C084FC] group-hover:underline">[ATT-0]</span>
             <span className="truncate">Exfiltrate All 5 Files</span>
           </button>
           {scenarios
@@ -644,9 +762,9 @@ export const AttackScenarios: React.FC = () => {
                   key={s.id}
                   onClick={() => handleExecuteCommand(cmdKey)}
                   disabled={isExecuting || deviceLocked}
-                  className="text-left hover:text-[#FFFFFF] hover:bg-[#111111] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+                  className="text-left hover:text-[#F3E8FF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
                 >
-                  <span className="font-bold text-[#FFFFFF] group-hover:underline">
+                  <span className="font-bold text-[#C084FC] group-hover:underline">
                     [{cmdKey.toUpperCase()}]
                   </span>
                   <span className="truncate">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
@@ -656,24 +774,27 @@ export const AttackScenarios: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Terminal Log Display */}
+      {/* ================================================================= */}
+      {/* 3. TERMINAL LOG VIEWPORT                                          */}
+      {/* ================================================================= */}
       <div
         ref={terminalBottomRef}
-        className="flex-1 bg-[#050505] border border-[#222222] rounded-lg p-3.5 overflow-y-auto space-y-1.5 min-h-[300px] max-h-[500px] text-xs font-mono"
+        className="flex-1 bg-[#05010A] border border-[#2A183E] rounded-lg p-3 overflow-y-auto space-y-1 text-xs font-mono min-h-[300px] max-h-[52vh] sm:max-h-[58vh]"
       >
         {terminalHistory.map((line, idx) => (
           <div
             key={idx}
-            className={`leading-relaxed whitespace-pre-wrap ${line.startsWith('c2-operator@terminal')
-              ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#151515] first:border-0'
-              : line.includes('ACCESS BLOCKED') || line.includes('dropped')
+            className={`leading-relaxed whitespace-pre-wrap break-words ${
+              line.startsWith('purple-hat@terminal')
+                ? 'text-[#F3E8FF] font-bold pt-1 border-t border-[#1E0F30] first:border-0'
+                : line.includes('ACCESS BLOCKED') || line.includes('dropped')
                 ? 'text-[#888888]'
                 : line.includes('EXPLOIT SUCCESSFUL') || line.includes('SAVED') || line.includes('BEGIN')
-                  ? 'text-[#FFFFFF] font-bold'
-                  : line.includes('WARNING') || line.includes('LOCKING')
-                    ? 'text-[#CCCCCC] font-bold'
-                    : 'text-[#AAAAAA]'
-              }`}
+                ? 'text-[#E9D5FF] font-bold'
+                : line.includes('WARNING') || line.includes('LOCKING')
+                ? 'text-[#FCA5A5] font-bold'
+                : 'text-[#C4B5FD]'
+            }`}
           >
             {line}
           </div>
@@ -681,22 +802,24 @@ export const AttackScenarios: React.FC = () => {
 
         {/* Countdown in Terminal */}
         {countdown !== null && (
-          <div className="p-2.5 rounded bg-[#111111] border border-[#333333] text-center text-sm font-black text-[#FFFFFF] animate-pulse my-2">
+          <div className="p-2.5 rounded bg-[#2E1065] border border-[#9333EA] text-center text-sm font-black text-[#F3E8FF] animate-pulse my-2">
             [!] REVERSE LOCKDOWN ENGAGING IN: {countdown}...
           </div>
         )}
       </div>
 
-      {/* 4. Interactive Command Input Box */}
+      {/* ================================================================= */}
+      {/* 4. INTERACTIVE COMMAND INPUT BOX                                  */}
+      {/* ================================================================= */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           handleExecuteCommand(commandInput);
         }}
-        className="mt-3 flex items-center gap-2 p-2 rounded-lg bg-[#0A0A0A] border border-[#222222]"
+        className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-[#0B0414] border border-[#2A183E]"
       >
-        <span className="text-xs font-bold text-[#FFFFFF] pl-1 select-none shrink-0">
-          c2-operator@terminal:{currentPath}#
+        <span className="text-[11px] sm:text-xs font-bold text-[#C084FC] pl-1 select-none shrink-0">
+          purple-hat#
         </span>
         <input
           ref={commandInputRef}
@@ -704,48 +827,74 @@ export const AttackScenarios: React.FC = () => {
           value={commandInput}
           onChange={(e) => setCommandInput(e.target.value)}
           disabled={isExecuting || deviceLocked}
-          placeholder="ls, cat <file>, att-0 to att-12, or sudo <cmd>..."
-          className="flex-1 bg-transparent text-xs text-[#FFFFFF] placeholder-[#555555] font-mono focus:outline-none"
+          placeholder="ls, cat <file>, att-0 to att-12, lock..."
+          className="flex-1 bg-transparent text-xs text-[#F3E8FF] placeholder-[#6B21A8] font-mono focus:outline-none min-w-0"
           autoFocus
         />
 
         <button
           type="submit"
           disabled={isExecuting || deviceLocked || !commandInput.trim()}
-          className="px-3 py-1.5 rounded bg-[#222222] hover:bg-[#333333] disabled:opacity-40 text-xs font-bold text-[#FFFFFF] flex items-center gap-1 transition-colors shrink-0"
+          className="px-3 py-1.5 rounded bg-[#2E1065] hover:bg-[#3B0764] disabled:opacity-40 text-xs font-bold text-[#F3E8FF] flex items-center gap-1 transition-colors shrink-0"
         >
           <span>RUN</span>
           <CornerDownLeft className="w-3 h-3" />
         </button>
       </form>
 
-      {/* Quick Launch Buttons */}
-      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] text-[#888888] scrollbar-none">
-        <span className="text-[10px] text-[#555555] shrink-0 font-bold">1-TAP:</span>
-        {['ls', 'cat recon_targets.txt', 'att-0', 'att-1', 'att-2', 'att-3'].map((cmd) => (
-          <button
-            key={cmd}
-            onClick={() => handleExecuteCommand(cmd)}
-            disabled={isExecuting || deviceLocked}
-            className="px-2 py-0.5 rounded bg-[#111111] hover:bg-[#222222] border border-[#262626] text-[#CCCCCC] font-bold shrink-0 transition-colors text-[10px]"
-          >
-            {cmd.toUpperCase()}
-          </button>
-        ))}
-      </div>
+      {/* ================================================================= */}
+      {/* 5. PWA / MOBILE DOWNLOAD INSTRUCTION MODAL                        */}
+      {/* ================================================================= */}
+      {showInstallModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0F051D] border border-[#7E22CE] rounded-xl p-4 max-w-sm w-full space-y-3 font-mono text-xs text-[#E9D5FF] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#2A183E] pb-2">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#F3E8FF]">
+                <Smartphone className="w-4 h-4 text-[#C084FC]" />
+                <span>INSTALL PURPLE HAT APP</span>
+              </div>
+              <button
+                onClick={() => setShowInstallModal(false)}
+                className="text-[#A855F7] hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#C4B5FD]">
+              Run Purple Hat Terminal full-screen on your phone like a native app:
+            </p>
+
+            <div className="space-y-2 text-[11px] bg-[#170A2E] p-2.5 rounded-lg border border-[#3B195C]">
+              <div className="font-bold text-[#F3E8FF]">Android (Chrome):</div>
+              <div>Tap the menu (⋮) at top right ➔ Select <strong className="text-white">"Install app"</strong> or <strong className="text-white">"Add to Home screen"</strong>.</div>
+
+              <div className="font-bold text-[#F3E8FF] pt-1 border-t border-[#2A183E]">iOS (Safari):</div>
+              <div>Tap the Share button (<Share2 className="w-3 h-3 inline text-[#C084FC]" />) at bottom ➔ Select <strong className="text-white">"Add to Home Screen"</strong>.</div>
+            </div>
+
+            <button
+              onClick={() => setShowInstallModal(false)}
+              className="w-full py-2 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-white font-bold text-xs"
+            >
+              GOT IT
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ================================================================= */}
-      {/* 5. DARK DEVIL BROWSER LOCKDOWN UI (EXACTLY TWO HEADINGS)          */}
+      {/* 6. DEVIL BROWSER BLOCKDOWN (ALL GESTURES / SWIPES IMPENETRABLE)   */}
       {/* ================================================================= */}
       {deviceLocked && (
         <div
-          onClick={handleLockedInteraction}
-          onTouchStart={handleLockedInteraction}
-          onTouchMove={handleLockedInteraction}
           onContextMenu={(e) => e.preventDefault()}
-          className="fixed inset-0 z-[999999] bg-[#050000] text-white flex flex-col justify-between items-center overflow-hidden select-none cursor-not-allowed font-mono"
+          className="fixed inset-0 z-[999999999] bg-[#050000] text-white flex flex-col justify-between items-center overflow-hidden select-none cursor-not-allowed font-mono w-screen h-screen"
           style={{
             touchAction: 'none',
+            overscrollBehavior: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
             background: 'radial-gradient(circle at center, #350000 0%, #150000 55%, #050000 100%)'
           }}
         >
