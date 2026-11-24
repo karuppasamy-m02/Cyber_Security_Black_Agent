@@ -3,13 +3,15 @@ import {
   CornerDownLeft,
   Skull,
   Download,
-  Smartphone,
-  Shield,
-  Layers,
   Terminal,
   X,
   Share2,
-  Check
+  Check,
+  Cpu,
+  HardDrive,
+  Wifi,
+  Folder,
+  FileText
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -112,16 +114,20 @@ export const AttackScenarios: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>('/var/data/targets/exfil');
   const [capturedFiles, setCapturedFiles] = useState<TargetFile[]>(DEFAULT_TARGET_FILES);
 
-  // Terminal History (High-contrast Black, White, and Purple)
+  // Terminal History (Linux Terminal Level Initial Banner)
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
-    '[*] PURPLE HAT TERMINAL // C2 ADVERSARY CONSOLE INITIALIZED',
-    '[*] Target gateway: 10.0.0.1 (All core ingress ports monitored)',
-    '[*] Exfil node: /var/data/targets/exfil (5 Target Files Armed)',
-    '[*] Quick Commands: "ls", "cat <file>", "att-0" to "att-12", "clear"',
-    '[*] Type command above and tap RUN or tap the 1-TAP pills.'
+    'Linux purplehat-c2 6.8.11-kali1-amd64 #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux',
+    'Kernel 6.8.11 • Terminal: pts/0 • Shell: /bin/bash • Host: 10.108.192.176',
+    'Session established for root (uid=0 gid=0). All attack modules loaded.',
+    ' ',
+    '[*] Ingress target gateway: 10.0.0.1 (All perimeter ports monitored)',
+    '[*] Target storage node: /var/data/targets/exfil (5 target files armed)',
+    '[*] Quick commands: "ls -la", "cat <file>", "whoami", "uname -a", "att-0" to "att-12", "clear"',
+    '[*] Type command above and tap RUN or tap the 1-TAP pills below.'
   ]);
   const [commandInput, setCommandInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
 
   // Target Agents status
   const [agentStatus, setAgentStatus] = useState<any>(null);
@@ -186,9 +192,9 @@ export const AttackScenarios: React.FC = () => {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
           setIsPwaInstalled(true);
+          setDeferredPrompt(null);
+          return;
         }
-        setDeferredPrompt(null);
-        return;
       } catch {
         setShowInstallModal(true);
       }
@@ -209,8 +215,8 @@ export const AttackScenarios: React.FC = () => {
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Purple Hat Terminal</title>
   <style>
-    body { margin:0; background:#000; color:#c084fc; font-family:monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; }
-    .loader { border:3px solid #3b0764; border-top:3px solid #c084fc; border-radius:50%; width:36px; height:36px; animation:spin 1s linear infinite; margin-bottom:16px; }
+    body { margin:0; background:#0c0c0f; color:#c084fc; font-family:monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; }
+    .loader { border:3px solid #2d1b4e; border-top:3px solid #c084fc; border-radius:50%; width:36px; height:36px; animation:spin 1s linear infinite; margin-bottom:16px; }
     @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
   </style>
 </head>
@@ -220,7 +226,7 @@ export const AttackScenarios: React.FC = () => {
   <script>
     setTimeout(function() {
       window.location.replace("${currentUrl}");
-    }, 300);
+    }, 250);
   </script>
 </body>
 </html>`;
@@ -432,7 +438,7 @@ export const AttackScenarios: React.FC = () => {
 
   useEffect(() => {
     const host = window.location.hostname;
-    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '10.108.192.176 (Mobile)' : host);
+    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '10.108.192.176' : host);
 
     fetchScenarios();
     fetchFiles();
@@ -480,19 +486,18 @@ export const AttackScenarios: React.FC = () => {
     }, 900);
   };
 
-  // 4. Command Router & Execution Logic (NO AUTO-ZOOM ON NORMAL COMMANDS!)
+  // 4. Command Router & Execution Logic (Authentic Linux Terminal Commands)
   const handleExecuteCommand = async (inputStr: string) => {
     const rawCmd = inputStr.trim();
     if (!rawCmd || isExecuting) return;
 
-    // Normal command execution NEVER triggers fullscreen or zoom!
-
+    setCommandHistory((prev) => [...prev, rawCmd]);
     const lower = rawCmd.toLowerCase();
-    const promptPrefix = `purple-hat@terminal:${currentPath}# `;
+    const promptDisplay = `┌──(root㉿purplehat)-[${currentPath}]\n└─# ${rawCmd}`;
 
-    // CLEAR
+    // CLEAR / CLS
     if (lower === 'clear' || lower === 'cls') {
-      setTerminalHistory(['[*] Terminal screen cleared. Ready for Purple Hat commands.']);
+      setTerminalHistory(['Linux purplehat-c2 terminal cleared. Ready for commands.']);
       setCommandInput('');
       return;
     }
@@ -501,15 +506,121 @@ export const AttackScenarios: React.FC = () => {
     if (lower === 'help') {
       setTerminalHistory((prev) => [
         ...prev,
-        `${promptPrefix}${rawCmd}`,
-        '=== PURPLE HAT TERMINAL COMMANDS ===',
-        '  ls [-l]          : List target repository exfiltration files',
+        promptDisplay,
+        '=== KALI LINUX TERMINAL UTILITIES & ATTACK MODULES ===',
+        '  ls [-la]         : List directory files with Unix permissions & sizes',
         '  cat <file>       : Inspect target file contents',
-        '  cd <dir>         : Change current directory',
-        '  pwd              : Print working directory',
-        '  att-0            : Exfiltrate all 5 target files',
-        '  att-1 to att-12  : Deploy attack vector scenarios',
-        '  clear            : Clear viewport'
+        '  cd <dir>         : Change current working directory',
+        '  pwd              : Print current working directory',
+        '  whoami           : Print current effective user ID (root)',
+        '  id               : Print user and group ID numbers',
+        '  uname [-a]       : Print Linux kernel architecture information',
+        '  hostname         : Print system network hostname',
+        '  date             : Print system date and timestamp',
+        '  ifconfig / ip a  : Display network adapter configurations',
+        '  ps [aux]         : List active system processes',
+        '  history          : Print command execution history',
+        '  att-0            : Exfiltrate all 5 target files across ports',
+        '  att-1 to att-12  : Deploy MITRE attack vector scenarios',
+        '  clear            : Clear terminal screen'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // WHOAMI
+    if (lower === 'whoami') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        'root'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // ID
+    if (lower === 'id') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        'uid=0(root) gid=0(root) groups=0(root),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev)'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // UNAME
+    if (lower === 'uname' || lower === 'uname -a' || lower === 'uname -r') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        'Linux purplehat-c2 6.8.11-kali1-amd64 #1 SMP PREEMPT_DYNAMIC Kali 6.8.11-1kali2 (2026-11-20) x86_64 GNU/Linux'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // HOSTNAME
+    if (lower === 'hostname') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        'purplehat-c2'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // DATE
+    if (lower === 'date') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        new Date().toUTCString()
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // IFCONFIG / IP A
+    if (lower === 'ifconfig' || lower === 'ip a' || lower === 'ip addr') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        `eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500`,
+        `        inet ${mobileIp}  netmask 255.255.255.0  broadcast 10.108.192.255`,
+        `        ether 02:42:0a:6c:c0:b0  txqueuelen 1000  (Ethernet)`,
+        `lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536`,
+        `        inet 127.0.0.1  netmask 255.0.0.0`
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // PS / PS AUX
+    if (lower === 'ps' || lower === 'ps aux' || lower === 'ps -ef') {
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        'USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND',
+        'root           1  0.0  0.1  21532  3420 ?        Ss   07:00   0:01 /sbin/init',
+        'root          42  0.0  0.4  84920 16384 ?        S    07:01   0:04 /usr/bin/c2-tunnel --daemon',
+        'root          98  0.2  0.8 142800 32768 pts/0    Ss+  07:15   0:12 /bin/bash',
+        'root         154  0.5  1.2 210400 49152 pts/0    R+   10:35   0:00 ps aux'
+      ]);
+      setCommandInput('');
+      return;
+    }
+
+    // HISTORY
+    if (lower === 'history') {
+      const historyLines = commandHistory.map((cmd, idx) => `  ${idx + 1}  ${cmd}`);
+      setTerminalHistory((prev) => [
+        ...prev,
+        promptDisplay,
+        ...historyLines,
+        `  ${commandHistory.length + 1}  history`
       ]);
       setCommandInput('');
       return;
@@ -519,7 +630,7 @@ export const AttackScenarios: React.FC = () => {
     if (lower === 'pwd') {
       setTerminalHistory((prev) => [
         ...prev,
-        `${promptPrefix}${rawCmd}`,
+        promptDisplay,
         currentPath
       ]);
       setCommandInput('');
@@ -545,8 +656,8 @@ export const AttackScenarios: React.FC = () => {
       setCurrentPath(newPath);
       setTerminalHistory((prev) => [
         ...prev,
-        `${promptPrefix}${rawCmd}`,
-        `Location updated: ${newPath}`
+        promptDisplay,
+        `Directory changed to: ${newPath}`
       ]);
       setCommandInput('');
       return;
@@ -555,13 +666,15 @@ export const AttackScenarios: React.FC = () => {
     // LS
     if (lower === 'ls' || lower.startsWith('ls ') || lower === 'dir') {
       const lines = [
-        `${promptPrefix}${rawCmd}`,
-        `total 5 files in ${currentPath}:`,
-        `-rw-r--r-- 1 purple-hat c2-agent  482 Nov 24 07:45 recon_targets.txt`,
-        `-rw-r--r-- 1 purple-hat c2-agent  512 Nov 24 07:45 customer_records.csv`,
-        `-rw-r--r-- 1 purple-hat c2-agent  345 Nov 24 07:45 api_endpoints.conf`,
-        `-rw-r--r-- 1 purple-hat c2-agent  418 Nov 24 07:45 system_architecture.json`,
-        `-rw-r--r-- 1 purple-hat c2-agent  520 Nov 24 07:45 audit_log_2026.txt`
+        promptDisplay,
+        `total 24`,
+        `drwxr-xr-x 2 root root 4096 Nov 24 10:30 .`,
+        `drwxr-xr-x 4 root root 4096 Nov 24 07:00 ..`,
+        `-rw-r--r-- 1 root root  482 Nov 24 07:45 recon_targets.txt`,
+        `-rw-r--r-- 1 root root  512 Nov 24 07:45 customer_records.csv`,
+        `-rw-r--r-- 1 root root  345 Nov 24 07:45 api_endpoints.conf`,
+        `-rw-r--r-- 1 root root  418 Nov 24 07:45 system_architecture.json`,
+        `-rw-r--r-- 1 root root  520 Nov 24 07:45 audit_log_2026.txt`
       ];
       setTerminalHistory((prev) => [...prev, ...lines]);
       setCommandInput('');
@@ -575,7 +688,7 @@ export const AttackScenarios: React.FC = () => {
       if (!filename) {
         setTerminalHistory((prev) => [
           ...prev,
-          `${promptPrefix}${rawCmd}`,
+          promptDisplay,
           'Usage: cat <filename> (e.g. cat recon_targets.txt)'
         ]);
         setCommandInput('');
@@ -589,7 +702,7 @@ export const AttackScenarios: React.FC = () => {
       if (found) {
         setTerminalHistory((prev) => [
           ...prev,
-          `${promptPrefix}${rawCmd}`,
+          promptDisplay,
           `--- BEGIN ${found.filename} (${found.size} bytes) ---`,
           found.content,
           `--- END ${found.filename} ---`
@@ -597,8 +710,8 @@ export const AttackScenarios: React.FC = () => {
       } else {
         setTerminalHistory((prev) => [
           ...prev,
-          `${promptPrefix}${rawCmd}`,
-          `cat: ${filename}: No such file or directory. Run "ls" to view available files.`
+          promptDisplay,
+          `cat: ${filename}: No such file or directory. Type "ls" to list files.`
         ]);
       }
       setCommandInput('');
@@ -611,11 +724,11 @@ export const AttackScenarios: React.FC = () => {
       commandToRun = rawCmd.substring(5).trim();
       setTerminalHistory((prev) => [
         ...prev,
-        `${promptPrefix}${rawCmd}`,
-        `[sudo] clearance verified for purple-hat operator.`
+        promptDisplay,
+        `[sudo] clearance verified for root operator.`
       ]);
     } else {
-      setTerminalHistory((prev) => [...prev, `${promptPrefix}${rawCmd}`]);
+      setTerminalHistory((prev) => [...prev, promptDisplay]);
     }
 
     // ATTACK COMMANDS: ATT-0 OR ATT-1 .. ATT-12
@@ -717,7 +830,7 @@ export const AttackScenarios: React.FC = () => {
     if (!targetScenario) {
       setTerminalHistory((prev) => [
         ...prev,
-        `[!] Command not recognized: "${commandToRun}". Type "help", "ls", "cat <file>", or "att-0" to "att-12".`
+        `bash: ${commandToRun}: command not found. Type "help", "ls", "whoami", or "att-0" to "att-12".`
       ]);
       setCommandInput('');
       return;
@@ -783,255 +896,284 @@ export const AttackScenarios: React.FC = () => {
   const isDarkActive = agentStatus?.dark_agent?.is_active ?? false;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#FFFFFF] font-mono selection:bg-[#3B0764] selection:text-[#F3E8FF] flex flex-col p-2.5 sm:p-4 select-none relative max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[#07070A] text-[#F1F5F9] font-mono selection:bg-[#4C1D95] selection:text-white flex flex-col p-2 sm:p-4 select-none relative max-w-5xl mx-auto">
       {/* ================================================================= */}
-      {/* 1. TOP PURPLE HAT TERMINAL HEADING ONLY                           */}
+      {/* 1. AUTHENTIC LINUX TERMINAL WINDOW CONTAINER                      */}
       {/* ================================================================= */}
-      <header className="border-b border-[#2A183E] pb-3 mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#2E1065] border border-[#7E22CE] flex items-center justify-center shadow-lg shadow-purple-950/60 shrink-0">
-            <Skull className="w-4 h-4 text-[#C084FC] animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-sm sm:text-base font-black tracking-widest uppercase text-[#FFFFFF] drop-shadow-[0_0_12px_rgba(168,85,247,0.5)]">
-              PURPLE HAT TERMINAL
-            </h1>
-            <div className="text-[10px] text-[#A855F7] flex items-center gap-2 font-mono">
-              <span className="text-[#C084FC]">C2-OPERATOR</span>
-              <span>•</span>
-              <span className="text-[#FFFFFF] font-semibold">{mobileIp}</span>
-              <span>•</span>
-              <span className={isDarkActive ? 'text-emerald-400 font-bold' : 'text-[#A855F7]'}>
-                {isDarkActive ? '● DECOY OPEN' : '● ARMORED'}
-              </span>
+      <div className="rounded-xl border border-[#232330] bg-[#0B0B10] shadow-2xl flex flex-col flex-1 overflow-hidden">
+        {/* Linux Titlebar */}
+        <div className="bg-[#13131A] border-b border-[#232330] px-3 py-2 flex items-center justify-between gap-2 select-none">
+          {/* Window Control Dots */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#EF4444] border border-[#DC2626] inline-block shadow-sm"></span>
+              <span className="w-3 h-3 rounded-full bg-[#F59E0B] border border-[#D97706] inline-block shadow-sm"></span>
+              <span className="w-3 h-3 rounded-full bg-[#10B981] border border-[#059669] inline-block shadow-sm"></span>
+            </div>
+            <div className="h-4 w-px bg-[#262636] mx-1"></div>
+            <div className="flex items-center gap-1.5 text-xs text-zinc-300">
+              <Terminal className="w-3.5 h-3.5 text-[#C084FC]" />
+              <span className="font-bold text-white tracking-wide">root@purplehat-c2</span>
+              <span className="text-zinc-500 hidden sm:inline">:~ (bash)</span>
             </div>
           </div>
-        </div>
 
-        {/* Mobile Download / Install App Button */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={handleInstallClick}
-            className={`px-2.5 sm:px-3 py-1.5 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all ${
-              isPwaInstalled
-                ? 'bg-[#140624] border-[#4C1D95] text-[#C4B5FD]'
-                : deferredPrompt
-                ? 'bg-gradient-to-r from-[#7E22CE] to-[#9333EA] border-[#C084FC] text-white shadow-purple-950/60 animate-pulse'
-                : 'bg-[#2E1065] hover:bg-[#3B0764] border-[#9333EA] text-[#FFFFFF]'
-            }`}
-            title="Install as Mobile PWA App"
-          >
-            <Download className="w-3.5 h-3.5 text-[#C084FC]" />
-            <span className="hidden sm:inline">
-              {isPwaInstalled ? 'PWA INSTALLED' : deferredPrompt ? 'INSTALL PWA APP' : 'INSTALL APP'}
-            </span>
-            <span className="sm:hidden">
-              {isPwaInstalled ? 'INSTALLED' : deferredPrompt ? 'INSTALL' : 'APP'}
-            </span>
-          </button>
-        </div>
-      </header>
+          {/* Right Status Badge & Clean PWA Install Button */}
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#1C122C] border border-[#581C87] text-[10px] text-[#D8B4FE]">
+              <span className={`w-1.5 h-1.5 rounded-full ${isDarkActive ? 'bg-emerald-400' : 'bg-purple-400'} animate-pulse`}></span>
+              <span>{mobileIp}</span>
+              <span>•</span>
+              <span className={isDarkActive ? 'text-emerald-300 font-bold' : 'text-purple-300'}>
+                {isDarkActive ? 'DECOY OPEN' : 'ARMORED'}
+              </span>
+            </div>
 
-      {/* ================================================================= */}
-      {/* 2. COMMAND ENTER IS TOP (NO MOBILE KEYBOARD OVERLAP, NO AUTO-ZOOM)*/}
-      {/* ================================================================= */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleExecuteCommand(commandInput);
-        }}
-        className="mb-2 flex items-center gap-2 p-2 rounded-lg bg-[#0B0414] border border-[#2A183E] shadow-lg shadow-purple-950/20"
-      >
-        <span className="text-xs sm:text-sm font-bold text-[#C084FC] pl-1 select-none shrink-0 font-mono">
-          purple-hat#
-        </span>
-        <input
-          ref={commandInputRef}
-          type="text"
-          value={commandInput}
-          onChange={(e) => setCommandInput(e.target.value)}
-          disabled={isExecuting || deviceLocked}
-          placeholder="Type ls, cat <file>, att-0 to att-12..."
-          style={{ fontSize: '16px' }} // Exactly 16px to prevent iOS Safari & Android zoom
-          className="flex-1 bg-transparent text-sm sm:text-xs text-[#FFFFFF] placeholder-[#7E22CE] font-mono focus:outline-none min-w-0"
-          autoFocus
-        />
-
-        <button
-          type="submit"
-          disabled={isExecuting || deviceLocked || !commandInput.trim()}
-          className="px-3.5 py-1.5 rounded bg-[#2E1065] hover:bg-[#3B0764] disabled:opacity-40 text-xs font-bold text-[#FFFFFF] flex items-center gap-1 transition-colors shrink-0 shadow-sm"
-        >
-          <span>RUN</span>
-          <CornerDownLeft className="w-3.5 h-3.5" />
-        </button>
-      </form>
-
-      {/* ================================================================= */}
-      {/* 3. ATTACK CHEATSHEET & 1-TAP QUICK COMMAND PILLS (NO LOCK BUTTON) */}
-      {/* ================================================================= */}
-      <div className="p-2.5 rounded-lg bg-[#08030F] border border-[#2A183E] text-xs space-y-2 mb-2">
-        <div className="text-[10px] sm:text-[11px] font-bold text-[#FFFFFF] flex items-center justify-between border-b border-[#1E0F30] pb-1">
-          <span className="text-[#C084FC]">OFFENSIVE VECTORS &amp; SHELL UTILITIES</span>
-          <span className="text-[#A855F7] text-[10px]">1-TAP TO RUN</span>
-        </div>
-
-        {/* 1-Tap Quick Action Pills (Lock button removed!) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
-          <span className="text-[10px] font-bold text-[#7E22CE] shrink-0">QUICK:</span>
-          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear'].map((cmd) => (
             <button
-              key={cmd}
-              onClick={() => handleExecuteCommand(cmd)}
-              disabled={isExecuting || deviceLocked}
-              className="px-2.5 py-1 rounded font-mono text-[10px] shrink-0 transition-colors border bg-[#180A28] hover:bg-[#2E1065] border-[#3B195C] text-[#FFFFFF] font-semibold active:scale-95"
+              onClick={handleInstallClick}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 shadow active:scale-95 transition-all ${
+                isPwaInstalled
+                  ? 'bg-zinc-900 border border-zinc-700 text-zinc-400'
+                  : deferredPrompt
+                  ? 'bg-gradient-to-r from-[#7E22CE] to-[#9333EA] border border-[#C084FC] text-white animate-pulse'
+                  : 'bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-white'
+              }`}
+              title="Install as Mobile Linux App"
             >
-              {cmd.toUpperCase()}
+              <Download className="w-3 h-3 text-[#C084FC]" />
+              <span className="hidden sm:inline">
+                {isPwaInstalled ? 'PWA INSTALLED' : deferredPrompt ? 'INSTALL PWA' : 'DOWNLOAD APP'}
+              </span>
+              <span className="sm:hidden">
+                {isPwaInstalled ? 'INSTALLED' : 'APP'}
+              </span>
             </button>
+          </div>
+        </div>
+
+        {/* Linux Shell Prompt Input (Top Section) */}
+        <div className="p-2 sm:p-2.5 bg-[#0F0F16] border-b border-[#1E1E2A]">
+          <div className="flex items-center justify-between text-[11px] text-zinc-400 pb-1 mb-1 border-b border-[#1A1A24]">
+            <div className="flex items-center gap-1.5 text-xs truncate">
+              <span className="text-[#38BDF8]">┌──(</span>
+              <span className="text-[#C084FC] font-bold">root㉿purplehat</span>
+              <span className="text-[#38BDF8]">)-[</span>
+              <span className="text-[#34D399] font-medium truncate max-w-[200px] sm:max-w-none">{currentPath}</span>
+              <span className="text-[#38BDF8]">]</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">linux-amd64</span>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleExecuteCommand(commandInput);
+            }}
+            className="flex items-center gap-2"
+          >
+            <span className="text-[#EF4444] font-black select-none text-xs sm:text-sm pl-0.5">
+              └─#
+            </span>
+            <input
+              ref={commandInputRef}
+              type="text"
+              value={commandInput}
+              onChange={(e) => setCommandInput(e.target.value)}
+              disabled={isExecuting || deviceLocked}
+              placeholder="Type ls, cat <file>, whoami, att-0 to att-12..."
+              style={{ fontSize: '16px' }} // Exactly 16px to prevent iOS & Android zoom
+              className="flex-1 bg-transparent text-sm sm:text-xs text-[#FFFFFF] placeholder-zinc-600 font-mono focus:outline-none min-w-0"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={isExecuting || deviceLocked || !commandInput.trim()}
+              className="px-3 py-1 rounded bg-[#2A1545] hover:bg-[#3D1A6A] border border-[#7E22CE] disabled:opacity-30 text-xs font-bold text-white flex items-center gap-1 transition-colors shrink-0 shadow-sm active:scale-95"
+            >
+              <span>RUN</span>
+              <CornerDownLeft className="w-3.5 h-3.5 text-[#C084FC]" />
+            </button>
+          </form>
+        </div>
+
+        {/* Linux Toolkit Quick Commands Strip */}
+        <div className="p-2 sm:p-2.5 bg-[#0C0C12] border-b border-[#1C1C26] text-xs space-y-1.5">
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-zinc-400 border-b border-[#1C1C26] pb-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#C084FC]">$</span>
+              <span>LINUX ADVERSARY TOOLKIT &amp; ATTACK VECTORS</span>
+            </div>
+            <span className="text-zinc-500 text-[10px]">1-TAP SHELL</span>
+          </div>
+
+          {/* Quick Shell Commands */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[11px] scrollbar-none">
+            <span className="text-[10px] text-zinc-500 shrink-0">SHELL:</span>
+            {['ls -la', 'cat recon_targets.txt', 'cat customer_records.csv', 'whoami', 'uname -a', 'ifconfig', 'ps aux', 'pwd', 'clear'].map((cmd) => (
+              <button
+                key={cmd}
+                onClick={() => handleExecuteCommand(cmd)}
+                disabled={isExecuting || deviceLocked}
+                className="px-2 py-0.5 rounded font-mono text-[10px] shrink-0 transition-all border bg-[#14141C] hover:bg-[#251B38] border-[#2A2A3A] hover:border-[#7E22CE] text-zinc-200 hover:text-white font-medium active:scale-95"
+              >
+                {cmd}
+              </button>
+            ))}
+          </div>
+
+          {/* Attack Scenarios Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1 text-[10px] sm:text-[11px] pt-1 border-t border-[#1C1C26]">
+            <button
+              onClick={() => handleExecuteCommand('att-0')}
+              disabled={isExecuting || deviceLocked}
+              className="text-left hover:text-white hover:bg-[#181824] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+            >
+              <span className="font-bold text-[#C084FC] group-hover:underline">[ATT-0]</span>
+              <span className="truncate text-zinc-300">Exfiltrate All 5 Files</span>
+            </button>
+            {scenarios
+              .filter((s) => s.id !== 'att-0')
+              .slice(0, 12)
+              .map((s, idx) => {
+                const cmdKey = `att-${idx + 1}`;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleExecuteCommand(cmdKey)}
+                    disabled={isExecuting || deviceLocked}
+                    className="text-left hover:text-white hover:bg-[#181824] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+                  >
+                    <span className="font-bold text-[#C084FC] group-hover:underline">
+                      [{cmdKey.toUpperCase()}]
+                    </span>
+                    <span className="truncate text-zinc-300">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+
+        {/* Linux Terminal Viewport */}
+        <div
+          ref={terminalBottomRef}
+          style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+          className="flex-1 bg-[#060609] p-3 sm:p-4 overflow-y-auto space-y-1 text-xs font-mono min-h-[350px] max-h-[58vh] sm:max-h-[64vh]"
+        >
+          {terminalHistory.map((line, idx) => (
+            <div
+              key={idx}
+              className={`leading-relaxed whitespace-pre-wrap break-words ${
+                line.startsWith('┌──(') || line.startsWith('└─#')
+                  ? 'text-[#38BDF8] font-bold pt-1 border-t border-[#171720] first:border-0'
+                  : line.includes('ACCESS BLOCKED') || line.includes('dropped') || line.includes('refused')
+                  ? 'text-[#EF4444] font-semibold'
+                  : line.includes('EXPLOIT SUCCESSFUL') || line.includes('PENETRATION SUCCESSFUL') || line.includes('SAVED')
+                  ? 'text-[#4ADE80] font-bold'
+                  : line.includes('WARNING') || line.includes('LOCKING') || line.includes('REVERSE')
+                  ? 'text-[#F87171] font-bold animate-pulse'
+                  : line.startsWith('drwx') || line.startsWith('-rw-') || line.startsWith('total ')
+                  ? 'text-[#A7F3D0]'
+                  : line.startsWith('[*]')
+                  ? 'text-[#C084FC]'
+                  : 'text-[#E2E8F0]'
+              }`}
+            >
+              {line}
+            </div>
           ))}
-        </div>
 
-        {/* Attack Vector Buttons Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1 text-[10px] sm:text-[11px] text-[#A855F7] pt-1 border-t border-[#1E0F30]">
-          <button
-            onClick={() => handleExecuteCommand('att-0')}
-            disabled={isExecuting || deviceLocked}
-            className="text-left hover:text-[#FFFFFF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
-          >
-            <span className="font-bold text-[#C084FC] group-hover:underline">[ATT-0]</span>
-            <span className="truncate text-[#E9D5FF]">Exfiltrate All 5 Files</span>
-          </button>
-          {scenarios
-            .filter((s) => s.id !== 'att-0')
-            .slice(0, 12)
-            .map((s, idx) => {
-              const cmdKey = `att-${idx + 1}`;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => handleExecuteCommand(cmdKey)}
-                  disabled={isExecuting || deviceLocked}
-                  className="text-left hover:text-[#FFFFFF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
-                >
-                  <span className="font-bold text-[#C084FC] group-hover:underline">
-                    [{cmdKey.toUpperCase()}]
-                  </span>
-                  <span className="truncate text-[#E9D5FF]">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
-                </button>
-              );
-            })}
+          {/* Countdown in Terminal */}
+          {countdown !== null && (
+            <div className="p-2.5 rounded bg-[#2E1065] border border-[#9333EA] text-center text-sm font-black text-[#FFFFFF] animate-pulse my-2">
+              [!] REVERSE LOCKDOWN ENGAGING IN: {countdown}...
+            </div>
+          )}
         </div>
       </div>
 
       {/* ================================================================= */}
-      {/* 4. TERMINAL LOG VIEWPORT (NATURAL SMOOTH TOUCH SCROLLING)        */}
-      {/* ================================================================= */}
-      <div
-        ref={terminalBottomRef}
-        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
-        className="flex-1 bg-[#05010A] border border-[#2A183E] rounded-lg p-3 overflow-y-auto space-y-1 text-xs font-mono min-h-[350px] max-h-[58vh] sm:max-h-[64vh]"
-      >
-        {terminalHistory.map((line, idx) => (
-          <div
-            key={idx}
-            className={`leading-relaxed whitespace-pre-wrap break-words ${
-              line.startsWith('purple-hat@terminal')
-                ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#1E0F30] first:border-0'
-                : line.includes('ACCESS BLOCKED') || line.includes('dropped')
-                ? 'text-[#888888]'
-                : line.includes('EXPLOIT SUCCESSFUL') || line.includes('SAVED') || line.includes('BEGIN')
-                ? 'text-[#FFFFFF] font-bold'
-                : line.includes('WARNING') || line.includes('LOCKING')
-                ? 'text-[#FCA5A5] font-bold'
-                : 'text-[#E9D5FF]'
-            }`}
-          >
-            {line}
-          </div>
-        ))}
-
-        {/* Countdown in Terminal */}
-        {countdown !== null && (
-          <div className="p-2.5 rounded bg-[#2E1065] border border-[#9333EA] text-center text-sm font-black text-[#FFFFFF] animate-pulse my-2">
-            [!] REVERSE LOCKDOWN ENGAGING IN: {countdown}...
-          </div>
-        )}
-      </div>
-
-      {/* ================================================================= */}
-      {/* 5. PWA / MOBILE DOWNLOAD INSTRUCTION MODAL                        */}
+      {/* 2. CLEAN LINUX PWA INSTALL & LAUNCHER MODAL                       */}
       {/* ================================================================= */}
       {showInstallModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0F051D] border border-[#7E22CE] rounded-xl p-4 max-w-sm w-full space-y-3 font-mono text-xs text-[#E9D5FF] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#2A183E] pb-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#FFFFFF]">
-                <Smartphone className="w-4 h-4 text-[#C084FC]" />
-                <span>INSTALL PURPLE HAT APP</span>
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0E0E14] border border-[#2D1B4E] rounded-xl max-w-sm w-full font-mono text-xs text-zinc-300 shadow-2xl overflow-hidden">
+            {/* Modal Titlebar */}
+            <div className="bg-[#151520] border-b border-[#232332] px-3 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F56] inline-block"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD2E] inline-block"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#27C93F] inline-block"></span>
+                </div>
+                <span className="font-bold text-white text-xs">install-pwa --package</span>
               </div>
               <button
                 onClick={() => setShowInstallModal(false)}
-                className="text-[#A855F7] hover:text-white"
+                className="text-zinc-400 hover:text-white p-1"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[11px] text-[#C4B5FD]">
-              Install Purple Hat as a mobile web app or download the instant launcher:
-            </p>
+            <div className="p-4 space-y-3">
+              <p className="text-[11px] text-zinc-400">
+                Install Purple Hat Terminal as an autonomous Linux application:
+              </p>
 
-            {deferredPrompt && (
-              <button
-                onClick={async () => {
-                  if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                      setIsPwaInstalled(true);
-                      setShowInstallModal(false);
+              {deferredPrompt && (
+                <button
+                  onClick={async () => {
+                    if (deferredPrompt) {
+                      deferredPrompt.prompt();
+                      const { outcome } = await deferredPrompt.userChoice;
+                      if (outcome === 'accepted') {
+                        setIsPwaInstalled(true);
+                        setShowInstallModal(false);
+                      }
+                      setDeferredPrompt(null);
                     }
-                    setDeferredPrompt(null);
-                  }
+                  }}
+                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#7E22CE] to-[#9333EA] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                >
+                  <Download className="w-4 h-4 text-white" />
+                  <span>1-TAP INSTALL PWA APP</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  handleDownloadLauncher();
+                  setShowInstallModal(false);
                 }}
-                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#7E22CE] to-[#9333EA] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-950/50 active:scale-95 transition-all"
+                className="w-full py-2 rounded-lg bg-[#1B1428] hover:bg-[#2A1B40] border border-[#7E22CE] text-white font-bold text-[11px] flex items-center justify-center gap-2 shadow active:scale-95 transition-all"
               >
-                <Download className="w-4 h-4 text-white" />
-                <span>1-TAP INSTALL NATIVE APP</span>
+                <Download className="w-3.5 h-3.5 text-[#C084FC]" />
+                <span>DOWNLOAD LAUNCHER SHORTCUT (.HTML)</span>
               </button>
-            )}
 
-            <button
-              onClick={() => {
-                handleDownloadLauncher();
-                setShowInstallModal(false);
-              }}
-              className="w-full py-2 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#A855F7] text-white font-bold text-[11px] flex items-center justify-center gap-2 shadow active:scale-95 transition-all"
-            >
-              <Download className="w-3.5 h-3.5 text-[#C084FC]" />
-              <span>DOWNLOAD LAUNCHER SHORTCUT (.HTML)</span>
-            </button>
+              <div className="space-y-1.5 text-[11px] bg-[#14141C] p-2.5 rounded-lg border border-[#232332]">
+                <div className="font-bold text-white">Manual Installation:</div>
+                <div className="text-zinc-400">
+                  • <strong className="text-zinc-200">Android (Chrome):</strong> Tap 3 dots (⋮) ➔ Select <strong className="text-[#C084FC]">"Install app"</strong> or <strong className="text-[#C084FC]">"Add to Home screen"</strong>.
+                </div>
+                <div className="text-zinc-400">
+                  • <strong className="text-zinc-200">iOS (Safari):</strong> Tap Share (<Share2 className="w-3 h-3 inline text-[#C084FC]" />) ➔ Select <strong className="text-[#C084FC]">"Add to Home Screen"</strong>.
+                </div>
+              </div>
 
-            <div className="space-y-2 text-[11px] bg-[#170A2E] p-2.5 rounded-lg border border-[#3B195C]">
-              <div className="font-bold text-[#FFFFFF]">Option 2: Android (Chrome Menu):</div>
-              <div>Tap the 3 dots (⋮) top-right ➔ Tap <strong className="text-white">"Install app"</strong> or <strong className="text-white">"Add to Home screen"</strong>.</div>
-
-              <div className="font-bold text-[#FFFFFF] pt-1 border-t border-[#2A183E]">Option 3: iOS (Safari Share):</div>
-              <div>Tap Share (<Share2 className="w-3 h-3 inline text-[#C084FC]" />) at bottom ➔ Select <strong className="text-white">"Add to Home Screen"</strong>.</div>
+              <button
+                onClick={() => setShowInstallModal(false)}
+                className="w-full py-1.5 rounded-lg bg-[#181822] hover:bg-[#20202E] border border-[#2C2C3C] text-zinc-400 font-semibold text-xs"
+              >
+                CLOSE
+              </button>
             </div>
-
-            <button
-              onClick={() => setShowInstallModal(false)}
-              className="w-full py-1.5 rounded-lg bg-[#140624] hover:bg-[#1E0935] border border-[#4C1D95] text-[#C4B5FD] font-semibold text-xs"
-            >
-              CLOSE
-            </button>
           </div>
         </div>
       )}
 
       {/* ================================================================= */}
-      {/* 6. FULL SCREEN BLOCKDOWN (ONLY APPEARS DURING DARK AGENT ATTACK)  */}
+      {/* 3. FULL SCREEN BLOCKDOWN (ONLY APPEARS DURING DARK AGENT ATTACK)  */}
       {/* ================================================================= */}
       {deviceLocked && (
         <div
