@@ -9,6 +9,8 @@ export const SystemSettings: React.FC = () => {
   const [truncateStatus, setTruncateStatus] = useState<string | null>(null);
   const [confirmTruncate, setConfirmTruncate] = useState(false);
   const [truncating, setTruncating] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedStatus, setSeedStatus] = useState<string | null>(null);
 
   const fetchHealth = async () => {
     try {
@@ -48,6 +50,20 @@ export const SystemSettings: React.FC = () => {
       setTruncateStatus(`Truncate failed: ${err.message}`);
     } finally {
       setTruncating(false);
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    try {
+      setSeeding(true);
+      setSeedStatus('Generating baseline cybersecurity demonstration telemetry...');
+      const res = await api.post<any>('/system/seed-demo');
+      setSeedStatus(res.message || 'Sample data seeded successfully.');
+      fetchHealth();
+    } catch (err: any) {
+      setSeedStatus(`Seed failed: ${err.message}`);
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -152,6 +168,37 @@ export const SystemSettings: React.FC = () => {
           <div className="p-3 rounded-lg bg-[#161616] border border-[#2B2B2B] text-xs font-mono text-emerald-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{truncateStatus}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Seed Sample Demo Data */}
+      <div className="bg-[#121212] border border-[#2B2B2B] rounded-xl p-5 space-y-4 shadow-subtle">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-[#F5F5F2] flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-emerald-400" />
+              Generate Sample Demonstration Telemetry
+            </h3>
+            <p className="text-xs text-[#A8A8A3] mt-1 font-mono">
+              Seeds baseline realistic multi-layer cybersecurity telemetry (SSH brute force, port scan, and data exfiltration) into the AMTIE engine for demonstrations and SOC testing.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSeedDemo}
+          disabled={seeding}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-[#181818] hover:bg-[#252525] border border-[#2B2B2B] text-emerald-400 font-medium text-xs transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${seeding ? 'animate-spin' : ''}`} />
+          <span>{seeding ? 'Seeding Sample Data...' : 'Seed Sample Demo Telemetry'}</span>
+        </button>
+
+        {seedStatus && (
+          <div className="p-3 rounded-lg bg-[#161616] border border-[#2B2B2B] text-xs font-mono text-emerald-400 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{seedStatus}</span>
           </div>
         )}
       </div>

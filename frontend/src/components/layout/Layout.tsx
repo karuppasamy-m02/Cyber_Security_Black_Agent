@@ -19,7 +19,7 @@ export const Layout: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F2] flex selection:bg-[#2B2B2B] selection:text-[#F5F5F2] transition-colors">
+    <div className="h-screen w-full bg-[#0A0A0A] text-[#F5F5F2] flex overflow-hidden selection:bg-[#2B2B2B] selection:text-[#F5F5F2] transition-colors">
       {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -28,7 +28,7 @@ export const Layout: React.FC = () => {
 
       {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ${
+        className={`flex-1 flex flex-col min-w-0 h-screen overflow-hidden transition-all duration-200 ${
           isSidebarOpen ? 'ml-64' : 'ml-16'
         }`}
       >
@@ -36,7 +36,7 @@ export const Layout: React.FC = () => {
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         />
-        <main className="flex-1 p-5 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>

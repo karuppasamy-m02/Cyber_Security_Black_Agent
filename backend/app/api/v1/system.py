@@ -176,3 +176,70 @@ def truncate_database_data(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to truncate database: {str(e)}")
+
+@router.post("/seed-demo")
+async def seed_sample_demo_data(db: Session = Depends(get_db)):
+    """
+    Seeds realistic baseline cybersecurity demonstration telemetry, events, and incidents.
+    Safe and idempotent generation of core sample records.
+    """
+    try:
+        from app.services.event_service import EventService
+        from app.schemas.events import EventIngest
+        from datetime import datetime, timezone
+
+        sample_events = [
+            EventIngest(
+                source_type="linux_auth",
+                source_ip="185.220.101.5",
+                destination_ip="10.0.0.10",
+                source_port=49210,
+                destination_port=22,
+                protocol="TCP",
+                event_category="Authentication",
+                severity="Critical",
+                raw_log="Failed password for invalid user root from 185.220.101.5 port 49210 ssh2",
+                normalized_payload={"failed_attempts": 15, "is_root": True, "target_user": "root"},
+                is_simulated=True
+            ),
+            EventIngest(
+                source_type="network_flow",
+                source_ip="10.0.0.45",
+                destination_ip="10.0.0.1",
+                source_port=51280,
+                destination_port=135,
+                protocol="TCP",
+                event_category="Network",
+                severity="High",
+                raw_log="FLOW TCP src=10.0.0.45 dst=10.0.0.1:135 PORTS_SCANNED=19 ACTION=REJECT",
+                normalized_payload={"distinct_ports_scanned": 19, "failed_attempts": 0},
+                is_simulated=True
+            ),
+            EventIngest(
+                source_type="network_flow",
+                source_ip="10.0.0.15",
+                destination_ip="198.51.100.23",
+                source_port=52190,
+                destination_port=443,
+                protocol="TCP",
+                event_category="Network",
+                severity="Critical",
+                raw_log="FLOW TCP src=10.0.0.15:52190 dst=198.51.100.23:443 BYTES_OUT=24800000 PROTO=TCP",
+                normalized_payload={"bytes_out": 24800000, "bytes_in": 500, "dst_port": 443},
+                is_simulated=True
+            )
+        ]
+
+        created = []
+        for s in sample_events:
+            ev = await EventService.ingest_single_event(s, db)
+            created.append(ev.id)
+
+        return {
+            "status": "success",
+            "message": f"Successfully seeded {len(created)} baseline telemetry events and correlated incidents.",
+            "seeded_count": len(created)
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to seed demo data: {str(e)}")

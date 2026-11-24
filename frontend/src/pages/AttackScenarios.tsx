@@ -108,17 +108,17 @@ const DEFAULT_TARGET_FILES: TargetFile[] = [
 
 export const AttackScenarios: React.FC = () => {
   const [scenarios, setScenarios] = useState<AttackScenario[]>([]);
-  const [mobileIp, setMobileIp] = useState<string>('192.168.1.8');
+  const [mobileIp, setMobileIp] = useState<string>('10.108.192.176');
   const [currentPath, setCurrentPath] = useState<string>('/var/data/targets/exfil');
   const [capturedFiles, setCapturedFiles] = useState<TargetFile[]>(DEFAULT_TARGET_FILES);
 
-  // Terminal History
+  // Terminal History (High-contrast Black, White, and Purple)
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
     '[*] PURPLE HAT TERMINAL // C2 ADVERSARY CONSOLE INITIALIZED',
-    '[*] Target gateway: 10.0.0.1 (Ports 22, 80, 443, 8000, 3306 monitored)',
+    '[*] Target gateway: 10.0.0.1 (All core ingress ports monitored)',
     '[*] Exfil node: /var/data/targets/exfil (5 Target Files Armed)',
     '[*] Quick Commands: "ls", "cat <file>", "att-0" to "att-12", "clear"',
-    '[*] Type "help" for full command guide or tap 1-TAP quick actions below.'
+    '[*] Type command above and tap RUN or tap the 1-TAP pills.'
   ]);
   const [commandInput, setCommandInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
@@ -126,7 +126,7 @@ export const AttackScenarios: React.FC = () => {
   // Target Agents status
   const [agentStatus, setAgentStatus] = useState<any>(null);
 
-  // Countdown & Lock State
+  // Countdown & Lock State (Engaged ONLY during Dark Agent attack)
   const [countdown, setCountdown] = useState<number | null>(null);
   const [deviceLocked, setDeviceLocked] = useState(false);
 
@@ -181,22 +181,90 @@ export const AttackScenarios: React.FC = () => {
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsPwaInstalled(true);
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setIsPwaInstalled(true);
+        }
+        setDeferredPrompt(null);
+        return;
+      } catch {
+        setShowInstallModal(true);
       }
-      setDeferredPrompt(null);
-    } else {
-      setShowInstallModal(true);
     }
+    setShowInstallModal(true);
   };
 
-  // 2. ABSOLUTE GESTURE & SWIPE LOCKDOWN (Forward, Backward, Top, Bottom, Edge-Swipes)
-  useEffect(() => {
-    if (!deviceLocked) return;
+  // Direct standalone web launcher file download
+  const handleDownloadLauncher = () => {
+    const currentUrl = window.location.href;
+    const launcherHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Purple Hat Terminal</title>
+  <style>
+    body { margin:0; background:#000; color:#c084fc; font-family:monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; }
+    .loader { border:3px solid #3b0764; border-top:3px solid #c084fc; border-radius:50%; width:36px; height:36px; animation:spin 1s linear infinite; margin-bottom:16px; }
+    @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="loader"></div>
+  <div style="font-size:14px;font-weight:bold;letter-spacing:2px;">LAUNCHING PURPLE HAT C2...</div>
+  <script>
+    setTimeout(function() {
+      window.location.replace("${currentUrl}");
+    }, 300);
+  </script>
+</body>
+</html>`;
+    const blob = new Blob([launcherHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'PurpleHat-App.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
-    // Trap history so swipe back/forward or back button stays on lock page
+  // 2. COMPREHENSIVE GESTURE, SWIPE & CONTROL LOCKDOWN: ONLY ENGAGED WHEN deviceLocked IS TRUE!
+  // During normal use, this hook does NOTHING and normal scroll works 100%!
+  useEffect(() => {
+    if (!deviceLocked) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+
+    // Trigger Fullscreen immediately
+    triggerFullscreen();
+
+    // Haptic vibration feedback on mobile
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([350, 150, 350, 150, 700]);
+      } catch {}
+    }
+
+    // Maintain Fullscreen: if user tries to swipe down status bar or exit, re-trigger
+    const handleFullscreenChange = () => {
+      if (deviceLocked && !document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        setTimeout(() => triggerFullscreen(), 50);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    // Trap history so swipe back/forward or mobile back button cannot exit
     window.history.pushState(null, '', window.location.href);
     const handlePopState = (e: PopStateEvent) => {
       e.preventDefault();
@@ -204,54 +272,99 @@ export const AttackScenarios: React.FC = () => {
     };
     window.addEventListener('popstate', handlePopState);
 
-    // Completely cancel all touchmove events (stops pull-to-refresh & scroll)
-    const preventTouch = (e: TouchEvent) => {
+    // Block page unload
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Secret emergency override (7 rapid taps anywhere within 2.5 seconds unlocks)
+    let secretTapCount = 0;
+    let lastTapTime = 0;
+    const registerSecretTap = () => {
+      const now = Date.now();
+      if (now - lastTapTime < 500) {
+        secretTapCount += 1;
+        if (secretTapCount >= 7) {
+          setDeviceLocked(false);
+          api.post('/agents/dark/release-lock').catch(() => {});
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      } else {
+        secretTapCount = 1;
+      }
+      lastTapTime = now;
+    };
+
+    // Complete block function for all user touch, pointer, and click interactions
+    const blockInteraction = (e: Event) => {
+      registerSecretTap();
       e.preventDefault();
       e.stopPropagation();
     };
 
-    // Cancel all touchstart with multi-touch (stops pinch/zoom gestures)
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 1) {
-        e.preventDefault();
-      }
-    };
+    // Block touch events (stops pull-to-refresh, pinch, swipe, scrolling, taps)
+    window.addEventListener('touchstart', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('touchmove', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('touchend', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('touchcancel', blockInteraction, { passive: false, capture: true });
 
-    // Prevent wheel scrolling
-    const preventWheel = (e: WheelEvent) => {
+    // Block mouse & pointer events
+    window.addEventListener('mousedown', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('mouseup', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('mousemove', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('click', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('dblclick', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('contextmenu', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('pointerdown', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('pointermove', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('pointerup', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('pointercancel', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('wheel', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('selectstart', blockInteraction, { passive: false, capture: true });
+    window.addEventListener('dragstart', blockInteraction, { passive: false, capture: true });
+
+    // Block keyboard navigation (Escape, F5, Ctrl+R, Alt+Left, etc.)
+    const blockKeyboard = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
     };
-
-    // Prevent navigation keys
-    const preventKeys = (e: KeyboardEvent) => {
-      if (
-        ['F5', 'Escape', 'Backspace'].includes(e.key) ||
-        (e.ctrlKey && ['r', 'R'].includes(e.key)) ||
-        (e.altKey && ['ArrowLeft', 'ArrowRight'].includes(e.key))
-      ) {
-        e.preventDefault();
-      }
-    };
-
-    // Prevent context menu
-    const preventContext = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-
-    window.addEventListener('touchmove', preventTouch, { passive: false });
-    window.addEventListener('touchstart', handleTouchStart, { passive: false });
-    window.addEventListener('wheel', preventWheel, { passive: false });
-    window.addEventListener('keydown', preventKeys);
-    window.addEventListener('contextmenu', preventContext);
+    window.addEventListener('keydown', blockKeyboard, { capture: true });
+    window.addEventListener('keyup', blockKeyboard, { capture: true });
+    window.addEventListener('keypress', blockKeyboard, { capture: true });
 
     return () => {
+      document.body.style.overflow = '';
       window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('touchmove', preventTouch);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('wheel', preventWheel);
-      window.removeEventListener('keydown', preventKeys);
-      window.removeEventListener('contextmenu', preventContext);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+      window.removeEventListener('touchstart', blockInteraction, { capture: true });
+      window.removeEventListener('touchmove', blockInteraction, { capture: true });
+      window.removeEventListener('touchend', blockInteraction, { capture: true });
+      window.removeEventListener('touchcancel', blockInteraction, { capture: true });
+
+      window.removeEventListener('mousedown', blockInteraction, { capture: true });
+      window.removeEventListener('mouseup', blockInteraction, { capture: true });
+      window.removeEventListener('mousemove', blockInteraction, { capture: true });
+      window.removeEventListener('click', blockInteraction, { capture: true });
+      window.removeEventListener('dblclick', blockInteraction, { capture: true });
+      window.removeEventListener('contextmenu', blockInteraction, { capture: true });
+      window.removeEventListener('pointerdown', blockInteraction, { capture: true });
+      window.removeEventListener('pointermove', blockInteraction, { capture: true });
+      window.removeEventListener('pointerup', blockInteraction, { capture: true });
+      window.removeEventListener('pointercancel', blockInteraction, { capture: true });
+      window.removeEventListener('wheel', blockInteraction, { capture: true });
+      window.removeEventListener('selectstart', blockInteraction, { capture: true });
+      window.removeEventListener('dragstart', blockInteraction, { capture: true });
+
+      window.removeEventListener('keydown', blockKeyboard, { capture: true });
+      window.removeEventListener('keyup', blockKeyboard, { capture: true });
+      window.removeEventListener('keypress', blockKeyboard, { capture: true });
     };
   }, [deviceLocked]);
 
@@ -285,7 +398,7 @@ export const AttackScenarios: React.FC = () => {
     }
   };
 
-  // Poll lock status from backend
+  // Poll lock status from backend (released remotely by operator)
   const checkBackendLock = async () => {
     try {
       const res = await api.get<any>('/agents/dark/lock-status');
@@ -309,7 +422,7 @@ export const AttackScenarios: React.FC = () => {
 
   useEffect(() => {
     const host = window.location.hostname;
-    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '192.168.1.8 (Mobile)' : host);
+    setMobileIp(host === 'localhost' || host === '127.0.0.1' ? '10.108.192.176 (Mobile)' : host);
 
     fetchScenarios();
     fetchFiles();
@@ -331,8 +444,8 @@ export const AttackScenarios: React.FC = () => {
   }, [terminalHistory, countdown]);
 
   // Start 5...4...3...2...1 Countdown to Red Browser Lock
+  // NOTE: Does NOT zoom during countdown so user can read logs! Only zooms on 0 when lock engages.
   const startCountdownAndLock = () => {
-    triggerFullscreen();
     let count = 5;
     setCountdown(count);
 
@@ -349,20 +462,20 @@ export const AttackScenarios: React.FC = () => {
         setCountdown(null);
         setTerminalHistory((prev) => [
           ...prev,
-          `[!] 0: BROWSER LOCK ENGAGED // DEVICE FULLY CONTROLLED BY DEVIL DEFENSE.`
+          `[!] 0: BROWSER LOCK ENGAGED // THIS DEVICE IS LOCKED BY DART.`
         ]);
         setDeviceLocked(true);
-        triggerFullscreen();
+        triggerFullscreen(); // Zooms into fullscreen ONLY when lock engages!
       }
     }, 900);
   };
 
-  // 4. Command Router & Execution Logic
+  // 4. Command Router & Execution Logic (NO AUTO-ZOOM ON NORMAL COMMANDS!)
   const handleExecuteCommand = async (inputStr: string) => {
     const rawCmd = inputStr.trim();
     if (!rawCmd || isExecuting) return;
 
-    triggerFullscreen();
+    // Normal command execution NEVER triggers fullscreen or zoom!
 
     const lower = rawCmd.toLowerCase();
     const promptPrefix = `purple-hat@terminal:${currentPath}# `;
@@ -386,21 +499,8 @@ export const AttackScenarios: React.FC = () => {
         '  pwd              : Print working directory',
         '  att-0            : Exfiltrate all 5 target files',
         '  att-1 to att-12  : Deploy attack vector scenarios',
-        '  lock             : Manually trigger browser lock demonstration',
         '  clear            : Clear viewport'
       ]);
-      setCommandInput('');
-      return;
-    }
-
-    // LOCK DEMO
-    if (lower === 'lock' || lower === 'block') {
-      setTerminalHistory((prev) => [
-        ...prev,
-        `${promptPrefix}${rawCmd}`,
-        '[*] Manual lock initiated: Triggering Devil Browser Lock...'
-      ]);
-      startCountdownAndLock();
       setCommandInput('');
       return;
     }
@@ -673,7 +773,7 @@ export const AttackScenarios: React.FC = () => {
   const isDarkActive = agentStatus?.dark_agent?.is_active ?? false;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#E0E0E0] font-mono selection:bg-[#3B0764] selection:text-[#F3E8FF] flex flex-col justify-between p-2.5 sm:p-4 select-none relative max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[#000000] text-[#FFFFFF] font-mono selection:bg-[#3B0764] selection:text-[#F3E8FF] flex flex-col p-2.5 sm:p-4 select-none relative max-w-5xl mx-auto">
       {/* ================================================================= */}
       {/* 1. TOP PURPLE HAT TERMINAL HEADING ONLY                           */}
       {/* ================================================================= */}
@@ -683,13 +783,13 @@ export const AttackScenarios: React.FC = () => {
             <Skull className="w-4 h-4 text-[#C084FC] animate-pulse" />
           </div>
           <div>
-            <h1 className="text-sm sm:text-base font-black tracking-widest uppercase text-[#F3E8FF] drop-shadow-[0_0_12px_rgba(168,85,247,0.5)]">
+            <h1 className="text-sm sm:text-base font-black tracking-widest uppercase text-[#FFFFFF] drop-shadow-[0_0_12px_rgba(168,85,247,0.5)]">
               PURPLE HAT TERMINAL
             </h1>
             <div className="text-[10px] text-[#A855F7] flex items-center gap-2 font-mono">
               <span className="text-[#C084FC]">C2-OPERATOR</span>
               <span>•</span>
-              <span className="text-[#E9D5FF]">{mobileIp}</span>
+              <span className="text-[#FFFFFF] font-semibold">{mobileIp}</span>
               <span>•</span>
               <span className={isDarkActive ? 'text-emerald-400 font-bold' : 'text-[#A855F7]'}>
                 {isDarkActive ? '● DECOY OPEN' : '● ARMORED'}
@@ -702,7 +802,7 @@ export const AttackScenarios: React.FC = () => {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={handleInstallClick}
-            className="px-2.5 py-1.5 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-[#F3E8FF] text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-purple-950/40 active:scale-95 transition-all"
+            className="px-2.5 py-1.5 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-[#FFFFFF] text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-purple-950/40 active:scale-95 transition-all"
             title="Download & Install as Mobile App"
           >
             <Download className="w-3.5 h-3.5 text-[#C084FC]" />
@@ -715,27 +815,58 @@ export const AttackScenarios: React.FC = () => {
       </header>
 
       {/* ================================================================= */}
-      {/* 2. ATTACK CHEATSHEET & 1-TAP QUICK COMMAND PILLS                  */}
+      {/* 2. COMMAND ENTER IS TOP (NO MOBILE KEYBOARD OVERLAP, NO AUTO-ZOOM)*/}
+      {/* ================================================================= */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleExecuteCommand(commandInput);
+        }}
+        className="mb-2 flex items-center gap-2 p-2 rounded-lg bg-[#0B0414] border border-[#2A183E] shadow-lg shadow-purple-950/20"
+      >
+        <span className="text-xs sm:text-sm font-bold text-[#C084FC] pl-1 select-none shrink-0 font-mono">
+          purple-hat#
+        </span>
+        <input
+          ref={commandInputRef}
+          type="text"
+          value={commandInput}
+          onChange={(e) => setCommandInput(e.target.value)}
+          disabled={isExecuting || deviceLocked}
+          placeholder="Type ls, cat <file>, att-0 to att-12..."
+          style={{ fontSize: '16px' }} // Exactly 16px to prevent iOS Safari & Android zoom
+          className="flex-1 bg-transparent text-sm sm:text-xs text-[#FFFFFF] placeholder-[#7E22CE] font-mono focus:outline-none min-w-0"
+          autoFocus
+        />
+
+        <button
+          type="submit"
+          disabled={isExecuting || deviceLocked || !commandInput.trim()}
+          className="px-3.5 py-1.5 rounded bg-[#2E1065] hover:bg-[#3B0764] disabled:opacity-40 text-xs font-bold text-[#FFFFFF] flex items-center gap-1 transition-colors shrink-0 shadow-sm"
+        >
+          <span>RUN</span>
+          <CornerDownLeft className="w-3.5 h-3.5" />
+        </button>
+      </form>
+
+      {/* ================================================================= */}
+      {/* 3. ATTACK CHEATSHEET & 1-TAP QUICK COMMAND PILLS (NO LOCK BUTTON) */}
       {/* ================================================================= */}
       <div className="p-2.5 rounded-lg bg-[#08030F] border border-[#2A183E] text-xs space-y-2 mb-2">
-        <div className="text-[10px] sm:text-[11px] font-bold text-[#F3E8FF] flex items-center justify-between border-b border-[#1E0F30] pb-1">
-          <span className="text-[#C084FC]">OFFENSIVE VECTORS MATRIX &amp; SHELL UTILITIES</span>
-          <span className="text-[#A855F7] text-[10px]">TAP TO DEPLOY</span>
+        <div className="text-[10px] sm:text-[11px] font-bold text-[#FFFFFF] flex items-center justify-between border-b border-[#1E0F30] pb-1">
+          <span className="text-[#C084FC]">OFFENSIVE VECTORS &amp; SHELL UTILITIES</span>
+          <span className="text-[#A855F7] text-[10px]">1-TAP TO RUN</span>
         </div>
 
-        {/* 1-Tap Quick Action Pills */}
+        {/* 1-Tap Quick Action Pills (Lock button removed!) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
           <span className="text-[10px] font-bold text-[#7E22CE] shrink-0">QUICK:</span>
-          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear', 'lock'].map((cmd) => (
+          {['ls', 'cat recon_targets.txt', 'cat customer_records.csv', 'pwd', 'att-0', 'clear'].map((cmd) => (
             <button
               key={cmd}
               onClick={() => handleExecuteCommand(cmd)}
               disabled={isExecuting || deviceLocked}
-              className={`px-2 py-0.5 rounded font-mono text-[10px] shrink-0 transition-colors border ${
-                cmd === 'lock'
-                  ? 'bg-red-950/80 hover:bg-red-900 border-red-700 text-red-200'
-                  : 'bg-[#180A28] hover:bg-[#2E1065] border-[#3B195C] text-[#E9D5FF]'
-              }`}
+              className="px-2.5 py-1 rounded font-mono text-[10px] shrink-0 transition-colors border bg-[#180A28] hover:bg-[#2E1065] border-[#3B195C] text-[#FFFFFF] font-semibold active:scale-95"
             >
               {cmd.toUpperCase()}
             </button>
@@ -747,10 +878,10 @@ export const AttackScenarios: React.FC = () => {
           <button
             onClick={() => handleExecuteCommand('att-0')}
             disabled={isExecuting || deviceLocked}
-            className="text-left hover:text-[#F3E8FF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+            className="text-left hover:text-[#FFFFFF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
           >
             <span className="font-bold text-[#C084FC] group-hover:underline">[ATT-0]</span>
-            <span className="truncate">Exfiltrate All 5 Files</span>
+            <span className="truncate text-[#E9D5FF]">Exfiltrate All 5 Files</span>
           </button>
           {scenarios
             .filter((s) => s.id !== 'att-0')
@@ -762,12 +893,12 @@ export const AttackScenarios: React.FC = () => {
                   key={s.id}
                   onClick={() => handleExecuteCommand(cmdKey)}
                   disabled={isExecuting || deviceLocked}
-                  className="text-left hover:text-[#F3E8FF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
+                  className="text-left hover:text-[#FFFFFF] hover:bg-[#180A28] p-1 rounded transition-colors flex items-center gap-1.5 truncate group"
                 >
                   <span className="font-bold text-[#C084FC] group-hover:underline">
                     [{cmdKey.toUpperCase()}]
                   </span>
-                  <span className="truncate">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
+                  <span className="truncate text-[#E9D5FF]">{s.title.replace(/^Scenario \d+:\s*/, '')}</span>
                 </button>
               );
             })}
@@ -775,25 +906,26 @@ export const AttackScenarios: React.FC = () => {
       </div>
 
       {/* ================================================================= */}
-      {/* 3. TERMINAL LOG VIEWPORT                                          */}
+      {/* 4. TERMINAL LOG VIEWPORT (NATURAL SMOOTH TOUCH SCROLLING)        */}
       {/* ================================================================= */}
       <div
         ref={terminalBottomRef}
-        className="flex-1 bg-[#05010A] border border-[#2A183E] rounded-lg p-3 overflow-y-auto space-y-1 text-xs font-mono min-h-[300px] max-h-[52vh] sm:max-h-[58vh]"
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 bg-[#05010A] border border-[#2A183E] rounded-lg p-3 overflow-y-auto space-y-1 text-xs font-mono min-h-[350px] max-h-[58vh] sm:max-h-[64vh]"
       >
         {terminalHistory.map((line, idx) => (
           <div
             key={idx}
             className={`leading-relaxed whitespace-pre-wrap break-words ${
               line.startsWith('purple-hat@terminal')
-                ? 'text-[#F3E8FF] font-bold pt-1 border-t border-[#1E0F30] first:border-0'
+                ? 'text-[#FFFFFF] font-bold pt-1 border-t border-[#1E0F30] first:border-0'
                 : line.includes('ACCESS BLOCKED') || line.includes('dropped')
                 ? 'text-[#888888]'
                 : line.includes('EXPLOIT SUCCESSFUL') || line.includes('SAVED') || line.includes('BEGIN')
-                ? 'text-[#E9D5FF] font-bold'
+                ? 'text-[#FFFFFF] font-bold'
                 : line.includes('WARNING') || line.includes('LOCKING')
                 ? 'text-[#FCA5A5] font-bold'
-                : 'text-[#C4B5FD]'
+                : 'text-[#E9D5FF]'
             }`}
           >
             {line}
@@ -802,45 +934,11 @@ export const AttackScenarios: React.FC = () => {
 
         {/* Countdown in Terminal */}
         {countdown !== null && (
-          <div className="p-2.5 rounded bg-[#2E1065] border border-[#9333EA] text-center text-sm font-black text-[#F3E8FF] animate-pulse my-2">
+          <div className="p-2.5 rounded bg-[#2E1065] border border-[#9333EA] text-center text-sm font-black text-[#FFFFFF] animate-pulse my-2">
             [!] REVERSE LOCKDOWN ENGAGING IN: {countdown}...
           </div>
         )}
       </div>
-
-      {/* ================================================================= */}
-      {/* 4. INTERACTIVE COMMAND INPUT BOX                                  */}
-      {/* ================================================================= */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleExecuteCommand(commandInput);
-        }}
-        className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-[#0B0414] border border-[#2A183E]"
-      >
-        <span className="text-[11px] sm:text-xs font-bold text-[#C084FC] pl-1 select-none shrink-0">
-          purple-hat#
-        </span>
-        <input
-          ref={commandInputRef}
-          type="text"
-          value={commandInput}
-          onChange={(e) => setCommandInput(e.target.value)}
-          disabled={isExecuting || deviceLocked}
-          placeholder="ls, cat <file>, att-0 to att-12, lock..."
-          className="flex-1 bg-transparent text-xs text-[#F3E8FF] placeholder-[#6B21A8] font-mono focus:outline-none min-w-0"
-          autoFocus
-        />
-
-        <button
-          type="submit"
-          disabled={isExecuting || deviceLocked || !commandInput.trim()}
-          className="px-3 py-1.5 rounded bg-[#2E1065] hover:bg-[#3B0764] disabled:opacity-40 text-xs font-bold text-[#F3E8FF] flex items-center gap-1 transition-colors shrink-0"
-        >
-          <span>RUN</span>
-          <CornerDownLeft className="w-3 h-3" />
-        </button>
-      </form>
 
       {/* ================================================================= */}
       {/* 5. PWA / MOBILE DOWNLOAD INSTRUCTION MODAL                        */}
@@ -849,7 +947,7 @@ export const AttackScenarios: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0F051D] border border-[#7E22CE] rounded-xl p-4 max-w-sm w-full space-y-3 font-mono text-xs text-[#E9D5FF] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#2A183E] pb-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#F3E8FF]">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#FFFFFF]">
                 <Smartphone className="w-4 h-4 text-[#C084FC]" />
                 <span>INSTALL PURPLE HAT APP</span>
               </div>
@@ -862,164 +960,95 @@ export const AttackScenarios: React.FC = () => {
             </div>
 
             <p className="text-[11px] text-[#C4B5FD]">
-              Run Purple Hat Terminal full-screen on your phone like a native app:
+              Install Purple Hat as a mobile web app or download the instant launcher:
             </p>
 
-            <div className="space-y-2 text-[11px] bg-[#170A2E] p-2.5 rounded-lg border border-[#3B195C]">
-              <div className="font-bold text-[#F3E8FF]">Android (Chrome):</div>
-              <div>Tap the menu (⋮) at top right ➔ Select <strong className="text-white">"Install app"</strong> or <strong className="text-white">"Add to Home screen"</strong>.</div>
+            {deferredPrompt && (
+              <button
+                onClick={async () => {
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                      setIsPwaInstalled(true);
+                      setShowInstallModal(false);
+                    }
+                    setDeferredPrompt(null);
+                  }
+                }}
+                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#7E22CE] to-[#9333EA] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-950/50 active:scale-95 transition-all"
+              >
+                <Download className="w-4 h-4 text-white" />
+                <span>1-TAP INSTALL NATIVE APP</span>
+              </button>
+            )}
 
-              <div className="font-bold text-[#F3E8FF] pt-1 border-t border-[#2A183E]">iOS (Safari):</div>
-              <div>Tap the Share button (<Share2 className="w-3 h-3 inline text-[#C084FC]" />) at bottom ➔ Select <strong className="text-white">"Add to Home Screen"</strong>.</div>
+            <button
+              onClick={() => {
+                handleDownloadLauncher();
+                setShowInstallModal(false);
+              }}
+              className="w-full py-2 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#A855F7] text-white font-bold text-[11px] flex items-center justify-center gap-2 shadow active:scale-95 transition-all"
+            >
+              <Download className="w-3.5 h-3.5 text-[#C084FC]" />
+              <span>DOWNLOAD LAUNCHER SHORTCUT (.HTML)</span>
+            </button>
+
+            <div className="space-y-2 text-[11px] bg-[#170A2E] p-2.5 rounded-lg border border-[#3B195C]">
+              <div className="font-bold text-[#FFFFFF]">Option 2: Android (Chrome Menu):</div>
+              <div>Tap the 3 dots (⋮) top-right ➔ Tap <strong className="text-white">"Install app"</strong> or <strong className="text-white">"Add to Home screen"</strong>.</div>
+
+              <div className="font-bold text-[#FFFFFF] pt-1 border-t border-[#2A183E]">Option 3: iOS (Safari Share):</div>
+              <div>Tap Share (<Share2 className="w-3 h-3 inline text-[#C084FC]" />) at bottom ➔ Select <strong className="text-white">"Add to Home Screen"</strong>.</div>
             </div>
 
             <button
               onClick={() => setShowInstallModal(false)}
-              className="w-full py-2 rounded-lg bg-[#2E1065] hover:bg-[#3B0764] border border-[#9333EA] text-white font-bold text-xs"
+              className="w-full py-1.5 rounded-lg bg-[#140624] hover:bg-[#1E0935] border border-[#4C1D95] text-[#C4B5FD] font-semibold text-xs"
             >
-              GOT IT
+              CLOSE
             </button>
           </div>
         </div>
       )}
 
       {/* ================================================================= */}
-      {/* 6. DEVIL BROWSER BLOCKDOWN (ALL GESTURES / SWIPES IMPENETRABLE)   */}
+      {/* 6. FULL SCREEN BLOCKDOWN (ONLY APPEARS DURING DARK AGENT ATTACK)  */}
       {/* ================================================================= */}
       {deviceLocked && (
         <div
-          onContextMenu={(e) => e.preventDefault()}
-          className="fixed inset-0 z-[999999999] bg-[#050000] text-white flex flex-col justify-between items-center overflow-hidden select-none cursor-not-allowed font-mono w-screen h-screen"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="fixed inset-0 z-[999999999] bg-[#000000] text-white flex items-center justify-center overflow-hidden select-none cursor-not-allowed font-mono w-screen h-screen"
           style={{
             touchAction: 'none',
             overscrollBehavior: 'none',
             userSelect: 'none',
             WebkitUserSelect: 'none',
-            background: 'radial-gradient(circle at center, #350000 0%, #150000 55%, #050000 100%)'
+            backgroundColor: '#000000'
           }}
         >
-          {/* Animated Red Scanlines */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-40 z-10"
+          {/* ONLY VIEW: THE EXACT BLOCK SCREEN IMAGE DISPLAYED EDGE-TO-EDGE FULL SCREEN */}
+          <img
+            src="/block-screen.jpg"
+            alt="THIS DEVICE IS LOCKED BY DART"
+            className="w-full h-full max-h-[100dvh] max-w-full object-contain sm:object-contain object-center select-none pointer-events-none"
             style={{
-              backgroundImage:
-                'repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.15) 0px, rgba(255, 0, 0, 0.15) 1px, transparent 1px, transparent 4px)',
-              backgroundSize: '100% 4px',
-              animation: 'redScanlines 8s linear infinite'
+              maxWidth: '100vw',
+              maxHeight: '100dvh',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              pointerEvents: 'none'
+            }}
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.endsWith('block-screen.png')) {
+                target.src = '/block-screen.png';
+              }
             }}
           />
-
-          {/* Deep Blood-Red Vignette */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.92)_100%)] pointer-events-none z-10" />
-
-          {/* 1. TOP HEADING: Centered inside a black banner with pulsing red neon borders */}
-          <div
-            className="w-full py-4 px-6 bg-black/95 border-b-2 z-30 flex items-center justify-center"
-            style={{
-              animation: 'borderPulse 2.5s ease-in-out infinite alternate'
-            }}
-          >
-            <h1
-              className="text-lg sm:text-2xl md:text-3xl font-black tracking-widest text-white uppercase text-center"
-              style={{
-                animation: 'neonFlicker 3s infinite'
-              }}
-            >
-              YOUR BROWSER BLOCKED BY DEVIL
-            </h1>
-          </div>
-
-          {/* 2. MAIN HEADING: DO NOT TOUCH with continuous smooth zigzag movement, subtle glitch & red neon glow */}
-          <div className="flex-1 flex items-center justify-center relative w-full overflow-hidden z-20">
-            <h2
-              className="font-black text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-widest text-white uppercase text-center select-none pointer-events-none"
-              style={{
-                animation: 'devilZigzag 4.5s ease-in-out infinite alternate, devilGlitch 3s infinite',
-                willChange: 'transform'
-              }}
-            >
-              DO NOT TOUCH
-            </h2>
-          </div>
-
-          <style>{`
-            @keyframes borderPulse {
-              0%, 100% {
-                border-color: #ff0000;
-                box-shadow: 0 4px 20px rgba(255, 0, 0, 0.6), inset 0 -2px 10px rgba(255, 0, 0, 0.4);
-              }
-              50% {
-                border-color: #ff3333;
-                box-shadow: 0 6px 35px rgba(255, 0, 0, 0.9), inset 0 -3px 15px rgba(255, 0, 0, 0.6);
-              }
-            }
-
-            @keyframes neonFlicker {
-              0%, 100% {
-                opacity: 1;
-                text-shadow: 0 0 10px #ff3333, 0 0 20px #ff0000, 0 0 35px #b30000;
-              }
-              41% {
-                opacity: 0.95;
-                text-shadow: 0 0 6px #ff3333, 0 0 14px #ff0000;
-              }
-              42% {
-                opacity: 1;
-                text-shadow: 0 0 12px #ff3333, 0 0 26px #ff0000, 0 0 40px #b30000;
-              }
-              77% {
-                opacity: 0.94;
-              }
-              78% {
-                opacity: 1;
-                text-shadow: 0 0 10px #ff3333, 0 0 20px #ff0000, 0 0 35px #b30000;
-              }
-            }
-
-            @keyframes devilZigzag {
-              0% {
-                transform: translate3d(-18vw, -14vh, 0) rotate(-4deg);
-              }
-              25% {
-                transform: translate3d(16vw, -4vh, 0) rotate(3deg);
-              }
-              50% {
-                transform: translate3d(-15vw, 6vh, 0) rotate(-3deg);
-              }
-              75% {
-                transform: translate3d(18vw, 15vh, 0) rotate(4deg);
-              }
-              100% {
-                transform: translate3d(-12vw, 22vh, 0) rotate(-2deg);
-              }
-            }
-
-            @keyframes devilGlitch {
-              0%, 94%, 100% {
-                text-shadow: 0 0 10px #ffffff, 0 0 25px #ff1a1a, 0 0 50px #ff0000, 0 0 90px #990000;
-              }
-              95% {
-                text-shadow: -3px 0 #00ffff, 3px 0 #ff0055, 0 0 30px #ff0000;
-                transform: translate3d(-18vw, -14vh, 0) skewX(-2deg);
-              }
-              96% {
-                text-shadow: 3px 0 #00ffff, -3px 0 #ff0055, 0 0 40px #ff0000;
-                transform: translate3d(-18vw, -14vh, 0) skewX(2deg);
-              }
-              97% {
-                text-shadow: 0 0 10px #ffffff, 0 0 25px #ff1a1a, 0 0 50px #ff0000, 0 0 90px #990000;
-              }
-            }
-
-            @keyframes redScanlines {
-              0% {
-                background-position: 0 0;
-              }
-              100% {
-                background-position: 0 80px;
-              }
-            }
-          `}</style>
         </div>
       )}
     </div>
